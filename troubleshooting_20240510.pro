@@ -13,12 +13,11 @@ wavelengths = v_metadata['WAVELENGTH']
 ; file:///C:/Program%20Files/Harris/ENVI56/IDL88/help/online_help/Subsystems/envi/Content/ExtendCustomize/ENVISubsetRaster/ENVISubsetRaster.htm
 lambda_max = 920
 indices_subset = WHERE(wavelengths LT lambda_max, count)
-SUBSET_vnir = ENVISubsetRaster(vnir_raster, BANDS= indices_subset)
+SUBSET_vnir = ENVISubsetRaster(vnir_raster, BANDS=indices_subset)
 
-; View raster
-;View1 = e.GetView()
-;
-;Layer1 = View1.CreateLayer(SUBSET_vnir)
+;View raster
+View1 = e.GetView()
+Layer1 = View1.CreateLayer(SUBSET_vnir)
 
 ;###################################################################################################################
 
@@ -26,19 +25,14 @@ SUBSET_vnir = ENVISubsetRaster(vnir_raster, BANDS= indices_subset)
 swir_raster = e.OpenRaster(swir_dir)
 ; View raster
 View2 = e.GetView()
-;
 Layer2 = View2.CreateLayer(swir_raster)
-
 ; SWIR dimensions
 swir_columns = swir_raster.NCOLUMNS
-
 swir_rows = swir_raster.NROWS
-
 
 ; Open Metadata file to get wavelengths
 s_metadata = swir_raster.METADATA
 wavelengths = s_metadata['WAVELENGTH']
-
 
 ; Subset SWIR to exclude bands that have wavelengths 1350-1450, and 1800-1900
 lambda_min_1 = 1350
@@ -71,56 +65,55 @@ DataColl = e.Data
 DataColl.Add, Task.OUTPUT_RASTER
 
 mirror_swir = e.OpenRaster(Task.OUTPUT_RASTER_URI)
-;View2 = e.GetView()
-;
-;Layer2 = View2.CreateLayer(mirror_swir)
+View2 = e.GetView()
 
+Layer2 = View2.CreateLayer(mirror_swir)
 
 ;###################################################################################################################
 ;https://www.nv5geospatialsoftware.com/docs/envisubsetrastertask.html#SUB_RECT
+;;https://www.nv5geospatialsoftware.com/docs/envipixelscaleresamplerastertask.html
 ; VNIR dimensions
 vnir_columns = vnir_raster.NCOLUMNS
+PRINT, vnir_columns
 vnir_rows = vnir_raster.NROWS
-column = (vnir_columns - 1)
-row = (vnir_rows - 1)
+PRINT, vnir_rows
+; SWIR dimensions
+swir_columns = mirror_swir.NCOLUMNS
+PRINT, swir_columns
+swir_rows = mirror_swir.NROWS
+PRINT, swir_rows
+col_factor = float(vnir_columns)/float(swir_columns)
+row_factor = float(vnir_rows)/float(swir_rows)
+PRINT, col_factor
+PRINT, row_factor
+Task = ENVITask('PixelScaleResampleRaster')
+Task.INPUT_RASTER = mirror_swir
+; Pixels cannot be scaled dow
+Task.PIXEL_SCALE = [col_factor, row_factor]
+Task.Execute 
+DataColl = e.Data
+DataColl.Add, Task.OUTPUT_RASTER
 
-; Perform spatial subsetting
-; file:///C:/Program%20Files/Harris/ENVI56/IDL88/help/online_help/help.htm#../Subsystems/envi/Content/ExtendCustomize/ENVITasks/ENVISubsetRasterTask.htm?Highlight=SubsetRaster
-subset_task = ENVITask('SubsetRaster')
-subset_task.INPUT_RASTER = mirror_swir
-subset_task.SUB_RECT = [0,0,column, row]
-subset_task.Execute
-
-; Get the output subset raster
-output_subset_raster = subset_task.OUTPUT_RASTER
-; Display the result
 View3 = e.GetView()
-Layer3 = View3.CreateLayer(output_subset_raster)
-View3.Zoom, /FULL_EXTENT
+Layer3 = View3.CreateLayer(Task.OUTPUT_RASTER) 
+swir_resized = Task.OUTPUT_RASTER
+
 ;###################################################################################################################
 ; file:///C:/Program%20Files/Harris/ENVI56/IDL88/help/online_help/Subsystems/envi/Content/ExtendCustomize/ENVITasks/ENVIBuildBandStackTask.htm
 VNIR = ENVISubsetRaster(SUBSET_vnir)
-
 Task = ENVITask('BuildBandStack')
-Task.INPUT_RASTERS = [output_subset_raster, SUBSET_vnir]
+Task.INPUT_RASTERS = [SUBSET_vnir, swir_resized]
 ; Run the task
-
 Task.Execute
-
 
 ; Add the output to the Data Manager
 
 e.Data.Add, Task.OUTPUT_RASTER
-
  
 ; Display the result
-
 View = e.GetView()
-
 Layer1 = View.CreateLayer(Task.OUTPUT_RASTER)
-
 Layer2 = View.CreateLayer(Task.OUTPUT_RASTER, BANDS=[1])
 
-
-
+PRINT, "Analysis Complete"
 END
