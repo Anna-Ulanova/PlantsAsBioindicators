@@ -73,17 +73,17 @@ Layer2 = View2.CreateLayer(mirror_swir)
 ;https://www.nv5geospatialsoftware.com/docs/envisubsetrastertask.html#SUB_RECT
 ;;https://www.nv5geospatialsoftware.com/docs/envipixelscaleresamplerastertask.html
 ; VNIR dimensions
-vnir_columns = vnir_raster.NCOLUMNS
+vnir_columns = SUBSET_vnir.NCOLUMNS
 PRINT, vnir_columns
-vnir_rows = vnir_raster.NROWS
+vnir_rows = SUBSET_vnir.NROWS
 PRINT, vnir_rows
 ; SWIR dimensions
 swir_columns = mirror_swir.NCOLUMNS
 PRINT, swir_columns
 swir_rows = mirror_swir.NROWS
 PRINT, swir_rows
-col_factor = float(vnir_columns)/float(swir_columns)
-row_factor = float(vnir_rows)/float(swir_rows)
+col_factor = float(swir_columns)/float(vnir_columns)
+row_factor = float(swir_rows)/float(vnir_rows)
 PRINT, col_factor
 PRINT, row_factor
 Task = ENVITask('PixelScaleResampleRaster')
