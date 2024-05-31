@@ -14,6 +14,13 @@ import csv
 '''
 Helper functions used inside other functions 
 '''
+def closest(list, k): 
+     list = np.asarray(list)
+     idx = (np.abs(list - k)).argmin()
+     print(list[idx])
+     print('func closest -- success')
+     return idx
+
 def find_wavelength(input):
     wavelengths = np.array(input.metadata['wavelength'])
     wavelengths = wavelengths.astype(float)
@@ -42,7 +49,7 @@ def subset_wavelengths(vnir):
     # Subset the hypercube
     subset_hypercube = vnir.read_bands(subset_indices)
     print('func subset_wavelengths -- success')
-    return subset_hypercube
+    return [subset_hypercube, wavelengths]
 
 def convert_2D(subsetted_hypercube):
     
@@ -60,19 +67,26 @@ def convert_2D(subsetted_hypercube):
 PCA also reduces the noise my data. The output increases the contrast between the grass/soil/tray, resulting in the soil core to be 
 darker and the tray to be bright. 
 '''
-def perform_PCA(reshaped_data, subset_hypercube):
+def perform_PCA(reshaped_data, subset_hypercube, wavelengths):
     # Apply PCA
-    pca = PCA(n_components=10)  # Reduce to 10 principal components
+    pca = PCA(n_components=150)  # Reduce to 10 principal components
     pca_data = pca.fit_transform(reshaped_data)
     # Reshape back to 3D (height,width, number of components)
-    pca_data_3D = pca_data.reshape((subset_hypercube.shape[0], subset_hypercube.shape[1], 10))
+    pca_data_3D = pca_data.reshape((subset_hypercube.shape[0], subset_hypercube.shape[1], 150))
+    # Associate Wavelengths with Bands in PCA-transformed Data
+    # Create an array to hold wavelengths associated with each band in PCA-transformed data
+    pca_wavelengths = np.empty(pca_data.shape[1])
+    # Assign wavelengths to each principal component based on their original bands
+    # Example: Assign first 10 wavelengths to the first principal component, next 10 wavelengths to the second principal component, and so on
+    for i in range(pca_data.shape[1]):
+        pca_wavelengths[i] = wavelengths[i]
     # Visualize the first principal component
     # Increases brightness of the soil sample
     plt.imshow(pca_data_3D[:, :, 0], cmap='gray')
     plt.title('First Principal Component')
     plt.show()
     print('func perform_PCA -- success')
-    return pca_data_3D
+    return [pca_data_3D, pca_wavelengths]
 
 '''
 4. Finds the indices of bands that have wavelengths corresponding to red/NIR
@@ -92,10 +106,10 @@ def find_indices_for_wavelength(wavelengths, wavelength):
     Returns:
         list: List of indices corresponding to "red" bands.
     """
-    list = np.asarray(wavelengths)
-    idx = (np.abs(list - wavelength)).argmin()
+    close_in_list = closest(wavelengths, wavelength)
+    # Use list comprehension to return index where the wavelength is found in list
     print('func find_indices_for_wavelength -- success')
-    return idx
+    return close_in_list
 
 
 ''' 
@@ -106,7 +120,7 @@ def find_indices_for_wavelength(wavelengths, wavelength):
 def calculate_NDVI(red_reflectance, NIR_reflectance):
     # Compute NDVI
     NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
-    
+    print(NDVI)
     # Display NDVI image
     plt.imshow(NDVI, cmap='RdYlGn')
     plt.colorbar()
@@ -137,13 +151,12 @@ os.chdir(target)
 
 vnir_data = open_hyperspectral_data(target, metadata, hyperspectral)
 
-subsetted_hypercube = subset_wavelengths(vnir_data)
+[subsetted_hypercube, wavelength] = subset_wavelengths(vnir_data)
 
 reshaped_data = convert_2D(subsetted_hypercube)
 
-pca_data_3D = perform_PCA(reshaped_data, subsetted_hypercube)
+[pca_data_3D, new_wavelength] = perform_PCA(reshaped_data, subsetted_hypercube, wavelength)
 
-new_wavelength = find_wavelength(pca_data_3D)
 
 red_wavelength_range = (625+740)/2
 NIR_wavelength_range = 920
@@ -155,8 +168,9 @@ NIR_band = find_indices_for_wavelength(new_wavelength, NIR_wavelength_range)
 # Extract the red and NIR bands
 print(pca_data_3D.shape)
 red = pca_data_3D[:, :, red_band]
+print(red)
 nir = pca_data_3D[:, :, NIR_band]
-
-NDVI = calculate_NDVI(red, nir, pca_data_3D)
+print(nir)
+NDVI = calculate_NDVI(red, nir)
 
 grass_classified = classify_dirt_grass(NDVI)
