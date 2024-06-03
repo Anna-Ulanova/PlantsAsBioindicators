@@ -34,7 +34,7 @@ def open_hyperspectral_data(target, metadata, hyperspectral):
     vnir = envi.open(os.path.join(target, metadata), os.path.join(target, hyperspectral))
     vnir_array = vnir.load()
     print('func open_hyperspectral_data -- success')
-    return vnir_array
+    return [vnir, vnir_array]
 #-------------------------------------------------------------------------------------------------------------------------------#
 '''
 3. Smoothing- Median filtering to remove the "salt and pepper" noise. 
@@ -42,24 +42,26 @@ def open_hyperspectral_data(target, metadata, hyperspectral):
 - Output matrix has the same dimensions as the input matrix 
 - Moved up earlier because the dimensions remain, unsure how to handle data types
 '''
-def smoothing_and_blurring(vnir_array):
+def smoothing_and_blurring(vnir, vnir_array):
     # Retrieve the wavelengths from the metadata
-    wavelengths = np.array(vnir_array.metadata['wavelength'], dtype=float)
-
+    wavelengths = np.array(vnir.metadata['wavelength'], dtype=float)
     # Apply median filter to each band
-    filtered_data = np.empty_like(vnir_array)
-    for i in range(vnir_array.shape[2]):
+    reshaped2D = convert_2D(vnir_array)
+    filtered_data = np.empty_like(reshaped2D)
+    print(reshaped2D.shape)
+    print(vnir_array.shape)
+    for i in range(reshaped2D.shape[1]):
         # cv2.medianBlur expects the input image to be 8-bit or 16-bit single-channel
-        # Ensure the data is in the correct format (uint8 or uint16)
-        band = vnir_array[:, :, i].astype(np.uint8)  # Convert to uint8 if necessary
-        filtered_data[:, :, i] = cv2.medianBlur(band, ksize=3)  # Apply median filter with a 3x3 kernel
+        specific_array = reshaped2D[:, i]
+        print(cv2.medianBlur(specific_array, ksize=3).shape)
+        filtered_data[:, i] = cv2.medianBlur(specific_array, ksize=3)  # Apply median filter with a 3x3 kernel
 
     # filtered_data now contains the noise-reduced hyperspectral data
     # wavelengths array remains unchanged
 
     # Example: Display one of the filtered bands along with its wavelength
     band_index = 30  # example band index
-    plt.imshow(filtered_data[:, :, band_index], cmap='gray')
+    plt.imshow(filtered_data, cmap='gray')
     plt.colorbar(label='Intensity')
     plt.title(f'Filtered Band {band_index} (Wavelength: {wavelengths[band_index]} nm)')
     plt.show()
@@ -184,16 +186,16 @@ hyperspectral = 'raw_rd_rf'
 
 os.chdir(target)
 
-vnir_data = open_hyperspectral_data(target, metadata, hyperspectral)
-
-[subsetted_hypercube, wavelength] = subset_wavelengths(vnir_data)
-
-reshaped_data = convert_2D(subsetted_hypercube)
-
+[vnir, vnir_data] = open_hyperspectral_data(target, metadata, hyperspectral)
 
 
 # [pca_data_3D, new_wavelength] = perform_PCA(reshaped_data, subsetted_hypercube, wavelength)
-[blurred, new_wavelength] = smoothing_and_blurring(reshaped_data)
+[blurred, new_wavelength] = smoothing_and_blurring(vnir, vnir_data)
+
+
+[subsetted_hypercube, wavelength] = subset_wavelengths(blurred)
+
+reshaped_data = convert_2D(subsetted_hypercube)
 
 red_wavelength_range = (625+740)/2
 NIR_wavelength_range = 920
@@ -203,8 +205,8 @@ print(red_band)
 NIR_band = find_indices_for_wavelength(new_wavelength, NIR_wavelength_range)
 
 # Extract the red and NIR bands
-print(blurred.shape)
-red = blurred[:, :, red_band]
+print(reshaped_data.shape)
+red = reshaped_data[:, :, red_band]
 print(red)
 
 plt.imshow(red, cmap='gray')
@@ -212,7 +214,7 @@ plt.title('Red Band')
 plt.colorbar(label='Intensity')
 plt.show()
 
-nir = blurred[:, :, NIR_band]
+nir = reshaped_data[:, :, NIR_band]
 print(nir)
 NDVI = calculate_NDVI(red, nir)
 
