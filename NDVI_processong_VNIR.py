@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from scipy.linalg import eigh
 import pywt
 import csv
+import cv2
 #-------------------------------------------------------------------------------------------------------------------------------#
 '''
 Helper functions used inside other functions 
@@ -35,7 +36,38 @@ def open_hyperspectral_data(target, metadata, hyperspectral):
     print('func open_hyperspectral_data -- success')
     return vnir_array
 #-------------------------------------------------------------------------------------------------------------------------------#
+'''
+3. Smoothing- Median filtering to remove the "salt and pepper" noise. 
+- Draws a 9 x 9 matrix around each element and determines the median value 
+- Output matrix has the same dimensions as the input matrix 
+- Moved up earlier because the dimensions remain, unsure how to handle data types
+'''
+def smoothing_and_blurring(vnir_array):
+    # Retrieve the wavelengths from the metadata
+    wavelengths = np.array(vnir_array.metadata['wavelength'], dtype=float)
 
+    # Apply median filter to each band
+    filtered_data = np.empty_like(vnir_array)
+    for i in range(vnir_array.shape[2]):
+        # cv2.medianBlur expects the input image to be 8-bit or 16-bit single-channel
+        # Ensure the data is in the correct format (uint8 or uint16)
+        band = vnir_array[:, :, i].astype(np.uint8)  # Convert to uint8 if necessary
+        filtered_data[:, :, i] = cv2.medianBlur(band, ksize=3)  # Apply median filter with a 3x3 kernel
+
+    # filtered_data now contains the noise-reduced hyperspectral data
+    # wavelengths array remains unchanged
+
+    # Example: Display one of the filtered bands along with its wavelength
+    band_index = 30  # example band index
+    plt.imshow(filtered_data[:, :, band_index], cmap='gray')
+    plt.colorbar(label='Intensity')
+    plt.title(f'Filtered Band {band_index} (Wavelength: {wavelengths[band_index]} nm)')
+    plt.show()
+
+    # Output the wavelengths for verification
+    print("Wavelengths:", wavelengths)
+    return [filtered_data, wavelengths]
+    
 '''
 1. Spectral subset of VNIR files for atmospheric correction
 - Adjusting for the effects of the atmosphere on the captured data, ensuring the spectral information accurately represents the ground.
@@ -60,33 +92,34 @@ def convert_2D(subsetted_hypercube):
     print('func convert_2D -- success')
     return reshaped_data 
 
-'''
-2. Feature Extraction
-- Given the large number of bands, it's often helpful to reduce the data's dimensionality while preserving important information.
-- Principal Component Analysis (PCA): A technique that transforms the data into a set of orthogonal components, reducing redundancy.
-PCA also reduces the noise my data. The output increases the contrast between the grass/soil/tray, resulting in the soil core to be 
-darker and the tray to be bright. 
-'''
-def perform_PCA(reshaped_data, subset_hypercube, wavelengths):
-    # Apply PCA
-    pca = PCA(n_components=150)  # Reduce to 10 principal components
-    pca_data = pca.fit_transform(reshaped_data)
-    # Reshape back to 3D (height,width, number of components)
-    pca_data_3D = pca_data.reshape((subset_hypercube.shape[0], subset_hypercube.shape[1], 150))
-    # Associate Wavelengths with Bands in PCA-transformed Data
-    # Create an array to hold wavelengths associated with each band in PCA-transformed data
-    pca_wavelengths = np.empty(pca_data.shape[1])
-    # Assign wavelengths to each principal component based on their original bands
-    # Example: Assign first 10 wavelengths to the first principal component, next 10 wavelengths to the second principal component, and so on
-    for i in range(pca_data.shape[1]):
-        pca_wavelengths[i] = wavelengths[i]
-    # Visualize the first principal component
-    # Increases brightness of the soil sample
-    plt.imshow(pca_data_3D[:, :, 0], cmap='gray')
-    plt.title('First Principal Component')
-    plt.show()
-    print('func perform_PCA -- success')
-    return [pca_data_3D, pca_wavelengths]
+# '''
+# 2. Feature Extraction
+# - Given the large number of bands, it's often helpful to reduce the data's dimensionality while preserving important information.
+# - Principal Component Analysis (PCA): A technique that transforms the data into a set of orthogonal components, reducing redundancy.
+# PCA also reduces the noise my data. The output increases the contrast between the grass/soil/tray, resulting in the soil core to be 
+# darker and the tray to be bright. 
+# '''
+# def perform_PCA(reshaped_data, subset_hypercube, wavelengths):
+#     # Apply PCA
+#     pca = PCA(n_components=220)  # Reduce to 10 principal components
+#     pca_data = pca.fit_transform(reshaped_data)
+#     # Reshape back to 3D (height,width, number of components)
+#     pca_data_3D = pca_data.reshape((subset_hypercube.shape[0], subset_hypercube.shape[1], 220))
+#     # Associate Wavelengths with Bands in PCA-transformed Data
+#     # Create an array to hold wavelengths associated with each band in PCA-transformed data
+#     pca_wavelengths = np.empty(pca_data.shape[1])
+#     # Assign wavelengths to each principal component based on their original bands
+#     # Example: Assign first 10 wavelengths to the first principal component, next 10 wavelengths to the second principal component, and so on
+#     for i in range(pca_data.shape[1]):
+#         pca_wavelengths[i] = wavelengths[i]
+#     # Visualize the first principal component
+#     # Increases brightness of the soil sample
+#     plt.imshow(pca_data_3D[:, :, 0], cmap='gray')
+#     plt.title('First Principal Component')
+#     plt.show()
+#     print('func perform_PCA -- success')
+#     return [pca_data_3D, pca_wavelengths]
+
 
 '''
 4. Finds the indices of bands that have wavelengths corresponding to red/NIR
@@ -143,6 +176,8 @@ def classify_dirt_grass(NDVI):
     plt.show()
     print('func classify_dirt_grass -- success')
     return grass_mask 
+
+print("Processing")
 target = r'C:\Users\RDCRLAAU\Desktop\Backup\overlapped_SWIR_VNIR\VNIR\GH_20231213\1_1_20231213_2023_12_13_07_44_08'
 metadata = 'raw_rd_rf.hdr'
 hyperspectral = 'raw_rd_rf'
@@ -155,8 +190,10 @@ vnir_data = open_hyperspectral_data(target, metadata, hyperspectral)
 
 reshaped_data = convert_2D(subsetted_hypercube)
 
-[pca_data_3D, new_wavelength] = perform_PCA(reshaped_data, subsetted_hypercube, wavelength)
 
+
+# [pca_data_3D, new_wavelength] = perform_PCA(reshaped_data, subsetted_hypercube, wavelength)
+[blurred, new_wavelength] = smoothing_and_blurring(reshaped_data)
 
 red_wavelength_range = (625+740)/2
 NIR_wavelength_range = 920
@@ -166,10 +203,16 @@ print(red_band)
 NIR_band = find_indices_for_wavelength(new_wavelength, NIR_wavelength_range)
 
 # Extract the red and NIR bands
-print(pca_data_3D.shape)
-red = pca_data_3D[:, :, red_band]
+print(blurred.shape)
+red = blurred[:, :, red_band]
 print(red)
-nir = pca_data_3D[:, :, NIR_band]
+
+plt.imshow(red, cmap='gray')
+plt.title('Red Band')
+plt.colorbar(label='Intensity')
+plt.show()
+
+nir = blurred[:, :, NIR_band]
 print(nir)
 NDVI = calculate_NDVI(red, nir)
 
