@@ -26,6 +26,16 @@ def find_wavelength(input):
     wavelengths = np.array(input.metadata['wavelength'])
     wavelengths = wavelengths.astype(float)
     return wavelengths
+
+def crop_raster(raster):
+    height, width, num_bands = raster.shape
+    top_h = round(height*0.8)
+    bottom_h = round(height*0.2)
+    print(top_h)
+    top_w = round(width*0.8)
+    bottom_w = round(width*0.2)
+    spatial_subset = raster[bottom_h:top_h, bottom_w:top_w, 0:num_bands]  
+    return spatial_subset 
 #-------------------------------------------------------------------------------------------------------------------------------#
 '''
 Opens the hyperspectral data
@@ -33,95 +43,42 @@ Opens the hyperspectral data
 def open_hyperspectral_data(target, metadata, hyperspectral): 
     vnir = envi.open(os.path.join(target, metadata), os.path.join(target, hyperspectral))
     vnir_array = vnir.load()
+    vnir_subset = crop_raster(vnir_array)
+    wavelength = np.array(vnir.metadata['wavelength'])
+    wavelengths_array = wavelength.astype(float)
     print('func open_hyperspectral_data -- success')
-    return [vnir, vnir_array]
+    return [vnir_subset, vnir, wavelengths_array]
 #-------------------------------------------------------------------------------------------------------------------------------#
+
+'''
+1. Spectral subset of VNIR files for atmospheric correction
+- Adjusting for the effects of the atmosphere on the captured data, ensuring the spectral information accurately represents the ground.
+'''
+def spectral_subset(median_blurred, wavelengths): 
+    # Find bands with wavelengths less than or equal to max_wavelength
+    subset_indices = np.where(wavelengths <=920.00)[0]
+    print(subset_indices)
+    # Subset the hypercube
+    subset_hypercube = median_blurred[:, :, subset_indices]
+    wavelengths = wavelengths[subset_indices]
+    print(wavelengths)
+    print('func subset_wavelengths -- success')
+    return [subset_hypercube, wavelengths]
+
+
 '''
 3. Smoothing- Median filtering to remove the "salt and pepper" noise. 
 - Draws a 9 x 9 matrix around each element and determines the median value 
 - Output matrix has the same dimensions as the input matrix 
 - Moved up earlier because the dimensions remain, unsure how to handle data types
 '''
-def smoothing_and_blurring(vnir, vnir_array):
-    # Retrieve the wavelengths from the metadata
-    wavelengths = np.array(vnir.metadata['wavelength'], dtype=float)
-    # Apply median filter to each band
-    reshaped2D = convert_2D(vnir_array)
-    filtered_data = np.empty_like(reshaped2D)
-    print(reshaped2D.shape)
-    print(vnir_array.shape)
-    for i in range(reshaped2D.shape[1]):
-        # cv2.medianBlur expects the input image to be 8-bit or 16-bit single-channel
-        specific_array = reshaped2D[:, i]
-        print(cv2.medianBlur(specific_array, ksize=3).shape)
-        filtered_data[:, i] = cv2.medianBlur(specific_array, ksize=3)  # Apply median filter with a 3x3 kernel
-
-    # filtered_data now contains the noise-reduced hyperspectral data
-    # wavelengths array remains unchanged
-
-    # Example: Display one of the filtered bands along with its wavelength
-    band_index = 30  # example band index
-    plt.imshow(filtered_data, cmap='gray')
-    plt.colorbar(label='Intensity')
-    plt.title(f'Filtered Band {band_index} (Wavelength: {wavelengths[band_index]} nm)')
-    plt.show()
-
-    # Output the wavelengths for verification
-    print("Wavelengths:", wavelengths)
-    return [filtered_data, wavelengths]
+def smoothing_and_blurring(vnir_array):
+    height, width, num_bands = vnir_array.shape
+    blurred_matrices = [cv2.medianBlur(vnir_array[:,:,i],3) for i in range(num_bands)]
+    filtered3D = np.dstack(blurred_matrices)
+    print('Filtered Array ', filtered3D.shape)
+    return filtered3D
     
-'''
-1. Spectral subset of VNIR files for atmospheric correction
-- Adjusting for the effects of the atmosphere on the captured data, ensuring the spectral information accurately represents the ground.
-'''
-def subset_wavelengths(vnir): 
-    # Find indices of subsetted wavelengths
-    # Extract wavelengths
-    wavelengths = find_wavelength(vnir)
-    # Find bands with wavelengths less than or equal to max_wavelength
-    subset_indices = np.where(wavelengths <=920.00)[0]
-    # Subset the hypercube
-    subset_hypercube = vnir.read_bands(subset_indices)
-    print('func subset_wavelengths -- success')
-    return [subset_hypercube, wavelengths]
-
-def convert_2D(subsetted_hypercube):
-    
-    # Assume `hyperspectral_data` is a 3D numpy array of shape (height, width, num_bands)
-    # Reshape the data to 2D (num_pixels, num_bands)
-    num_pixels = subsetted_hypercube.shape[0]*subsetted_hypercube.shape[1]
-    reshaped_data = subsetted_hypercube.reshape((num_pixels, subsetted_hypercube.shape[2]))
-    print('func convert_2D -- success')
-    return reshaped_data 
-
-# '''
-# 2. Feature Extraction
-# - Given the large number of bands, it's often helpful to reduce the data's dimensionality while preserving important information.
-# - Principal Component Analysis (PCA): A technique that transforms the data into a set of orthogonal components, reducing redundancy.
-# PCA also reduces the noise my data. The output increases the contrast between the grass/soil/tray, resulting in the soil core to be 
-# darker and the tray to be bright. 
-# '''
-# def perform_PCA(reshaped_data, subset_hypercube, wavelengths):
-#     # Apply PCA
-#     pca = PCA(n_components=220)  # Reduce to 10 principal components
-#     pca_data = pca.fit_transform(reshaped_data)
-#     # Reshape back to 3D (height,width, number of components)
-#     pca_data_3D = pca_data.reshape((subset_hypercube.shape[0], subset_hypercube.shape[1], 220))
-#     # Associate Wavelengths with Bands in PCA-transformed Data
-#     # Create an array to hold wavelengths associated with each band in PCA-transformed data
-#     pca_wavelengths = np.empty(pca_data.shape[1])
-#     # Assign wavelengths to each principal component based on their original bands
-#     # Example: Assign first 10 wavelengths to the first principal component, next 10 wavelengths to the second principal component, and so on
-#     for i in range(pca_data.shape[1]):
-#         pca_wavelengths[i] = wavelengths[i]
-#     # Visualize the first principal component
-#     # Increases brightness of the soil sample
-#     plt.imshow(pca_data_3D[:, :, 0], cmap='gray')
-#     plt.title('First Principal Component')
-#     plt.show()
-#     print('func perform_PCA -- success')
-#     return [pca_data_3D, pca_wavelengths]
-
 
 '''
 4. Finds the indices of bands that have wavelengths corresponding to red/NIR
@@ -170,7 +127,7 @@ def calculate_NDVI(red_reflectance, NIR_reflectance):
 '''
 def classify_dirt_grass(NDVI): 
     # Threshold NDVI to classify grass and dirt
-    ndvi_threshold = 0.6  # Example threshold; values above 0.2 are considered grass
+    ndvi_threshold = 0.2  # Example threshold; values above 0.2 are considered grass
     grass_mask = NDVI > ndvi_threshold
     # Visualize the classification result
     plt.imshow(grass_mask, cmap='gray')
@@ -186,36 +143,48 @@ hyperspectral = 'raw_rd_rf'
 
 os.chdir(target)
 
-[vnir, vnir_data] = open_hyperspectral_data(target, metadata, hyperspectral)
+[vnir_data, vnir, wavelengths] = open_hyperspectral_data(target, metadata, hyperspectral)
+
+plt.imshow(vnir_data[:, :, 100], cmap='gray')
+plt.title('Original')
+plt.colorbar(label='Intensity')
+plt.show()
+
+blurred = smoothing_and_blurring(vnir_data)
+
+plt.imshow(blurred[:,:,100], cmap='gray')
+plt.title('Median Filtering')
+plt.colorbar(label='Intensity')
+plt.show()
 
 
-# [pca_data_3D, new_wavelength] = perform_PCA(reshaped_data, subsetted_hypercube, wavelength)
-[blurred, new_wavelength] = smoothing_and_blurring(vnir, vnir_data)
+[subsetted_hypercube, wavelengths] = spectral_subset(blurred, wavelengths)
 
 
-[subsetted_hypercube, wavelength] = subset_wavelengths(blurred)
+red_wavelength = (625+740)/2
+NIR_wavelength = (780+1000)/2
 
-reshaped_data = convert_2D(subsetted_hypercube)
-
-red_wavelength_range = (625+740)/2
-NIR_wavelength_range = 920
-
-red_band = find_indices_for_wavelength(new_wavelength, red_wavelength_range)
-print(red_band)
-NIR_band = find_indices_for_wavelength(new_wavelength, NIR_wavelength_range)
-
+red_band = find_indices_for_wavelength(wavelengths, red_wavelength)
+print('Red band number: ', red_band)
 # Extract the red and NIR bands
-print(reshaped_data.shape)
-red = reshaped_data[:, :, red_band]
-print(red)
-
+red = subsetted_hypercube[:, :, red_band]
+# Displays red band
 plt.imshow(red, cmap='gray')
 plt.title('Red Band')
 plt.colorbar(label='Intensity')
 plt.show()
 
-nir = reshaped_data[:, :, NIR_band]
-print(nir)
+
+NIR_band = find_indices_for_wavelength(wavelengths, NIR_wavelength)
+print('NIR band number: ', NIR_band)
+nir = subsetted_hypercube[:, :, NIR_band]
+# Displays red band
+plt.imshow(nir, cmap='gray')
+plt.title('NIR Band')
+plt.colorbar(label='Intensity')
+plt.show()
+
+
 NDVI = calculate_NDVI(red, nir)
 
 grass_classified = classify_dirt_grass(NDVI)
