@@ -16,6 +16,15 @@ import cv2
 '''
 Helper functions used inside other functions 
 '''
+def convert_2D(subsetted_hypercube):
+
+    # Assume `hyperspectral_data` is a 3D numpy array of shape (height, width, num_bands)
+    # Reshape the data to 2D (num_pixels, num_bands)
+    num_pixels = subsetted_hypercube.shape[0]*subsetted_hypercube.shape[1]
+    reshaped_data = subsetted_hypercube.reshape((num_pixels, subsetted_hypercube.shape[2]))
+    print('func convert_2D -- success')
+    return reshaped_data 
+
 def closest(list, k): 
      list = np.asarray(list)
      idx = (np.abs(list - k)).argmin()
@@ -30,11 +39,11 @@ def find_wavelength(input):
 
 def crop_raster(raster):
     height, width, num_bands = raster.shape
-    top_h = round(height*0.75)
-    bottom_h = round(height*0.25)
+    top_h = round(height*0.8)
+    bottom_h = round(height*0.2)
     # print(top_h)
-    top_w = round(width*0.75)
-    bottom_w = round(width*0.25)
+    top_w = round(width*0.8)
+    bottom_w = round(width*0.2)
     spatial_subset = raster[bottom_h:top_h, bottom_w:top_w, 0:num_bands]  
     return spatial_subset 
 #-------------------------------------------------------------------------------------------------------------------------------#
@@ -116,17 +125,17 @@ def calculate_NDVI(red_reflectance, NIR_reflectance):
     #NDVI = (1- red_reflectance/NIR_reflectance)*(1+red_reflectance/NIR_reflectance)
     print(red_reflectance.shape)
     NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
-    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_raw.txt', NDVI)
+    # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_raw.txt', NDVI)
     print('NDVI shape is: ', NDVI.shape)
     NDVI_minus_background = post_processing(NDVI)
-    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
+    # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
     print(NDVI_minus_background)
-    # Display NDVI image
-    plt.imshow(NDVI, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('NDVI Image Raw')
-    plt.show()
-
+    # Display raw NDVI image
+    # plt.imshow(NDVI, cmap='RdYlGn')
+    # plt.colorbar()
+    # plt.title('NDVI Image Raw')
+    # plt.show()
+    # Display NDVI image without background
     plt.imshow(NDVI_minus_background, cmap='RdYlGn')
     plt.colorbar()
     plt.title('NDVI Image Remove Background')
@@ -159,10 +168,28 @@ def post_processing(array):
     gaussian = gaussian_filter(masked_vegetated, sigma=1)
     return gaussian
 
-
+'''
+Bootstrapping output matrix
+-- Resamples a 10 by 10 matrix that does not contain zeros and 
+'''
 def bootstrapping(indices): 
-    matrix = np.zeros(10,10)
-    return matrix
+    num_resamples = 1000
+    square_side = 10 
+    row, col = indices.shape
+    row_lim = row-10 
+    col_lim = col -10
+    i= 0
+    overall_mat = np.zeros((1, 10))
+    while i  <num_resamples:
+        random_row_point = np.random.randint(10, row_lim)
+        random_col_point = np.random.randint(10, col_lim)
+        sub_array = indices[random_row_point:(random_row_point + square_side), random_col_point:(random_col_point + square_side)]
+        if 0 not in sub_array:
+            i=i+1
+            overall_mat= np.concatenate([overall_mat,sub_array], axis=0)
+    print('sampled bootstrapped array: ', overall_mat.shape)
+    NDVI_average = np.concatenate(overall_mat).sum()/(square_side*square_side*num_resamples)
+    return NDVI_average
 '''
 6. Classifies grass/dirt based on threshold input
 - Classifies live/healthy grass based on threshold 0.6, reference: https://www.nature.com/articles/s41597-023-02255-3#Sec1 
@@ -172,19 +199,22 @@ def classify_dirt_grass(NDVI):
     ndvi_threshold = 0.25 # Example threshold; values above 0.2 are considered grass
     grass_mask = NDVI > ndvi_threshold
     # Visualize the classification result
-    plt.imshow(grass_mask, cmap='gray')
-    plt.title('Grass Classification')
-    plt.show()
+    # plt.imshow(grass_mask, cmap='gray')
+    # plt.title('Grass Classification')
+    # plt.show()
     print('func classify_dirt_grass -- success')
     return grass_mask 
 
 print("Processing")
 
 # Dead grass
-#target = r'C:\Users\RDCRLAAU\Desktop\Backup\overlapped_SWIR_VNIR\VNIR\GH_20231213\1_1_20231213_2023_12_13_07_44_08'
-target = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\VNIR\GH_20231213_1_1_20231213_2023_12_13_07_44_08'
-
-
+target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\\GH_20231213_1_1_20231213_2023_12_13_07_44_08'
+# target = 'C:\\Users\\RDCRLAAU\\Desktop\\Plant as bioindicators\\VNIR\\GH_20230724_12_1_20230724_2023_07_24_12_07_56'
+# target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20230726_3_2_20230726_2023_07_26_09_41_37'
+# target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20230822_9_2_20230822_2023_08_22_07_09_53'
+# target = 'C:\\Users\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20231116_6_1_20231116_2023_11_16_07_07_28'
+# target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20231116_15_2_20231116_2023_11_16_10_50_03'
+# target = 'C:\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\\GH_20231121_3_3_20231121_2023_11_21_08_52_18'
 # Live grass 
 #target = r'D:\VNIR\GH_20231116\15_2_20231116_2023_11_16_10_50_03'
 metadata = 'raw_rd_rf.hdr'
@@ -207,7 +237,7 @@ print('median blurring: ', blurred.shape)
 # plt.show()
 
 
-[subsetted_hypercube, wavelengths] = spectral_subset(vnir_data, wavelengths)
+[subsetted_hypercube, wavelengths] = spectral_subset(blurred, wavelengths)
 
 
 red_wavelength = (625+740)/2
@@ -246,7 +276,22 @@ blue = subsetted_hypercube[:, :, blue_band]
 
 
 NDVI = calculate_NDVI(red, nir)
-
 EVI = calculate_EVI(red, nir, blue)
 grass_classified = classify_dirt_grass(NDVI)
 grass_classified = classify_dirt_grass(EVI)
+
+NDVI_averaged = bootstrapping(NDVI)
+EVI_averaged = bootstrapping(EVI)
+
+results_doc_dir = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages.txt'
+append_new = target +'\t'+str(NDVI_averaged)+'\t'+str(EVI_averaged)
+# Open the file in append & read mode ('a+')
+with open(results_doc_dir, "a+") as file_object:
+    # Move read cursor to the start of file.
+    file_object.seek(0)
+    # If file is not empty then append '\n'
+    data = file_object.read(100)
+    if len(data) > 0 :
+        file_object.write("\n")
+    # Append text at the end of file
+    file_object.write(append_new)
