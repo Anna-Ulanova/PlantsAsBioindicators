@@ -7,6 +7,7 @@ import matplotlib
 import os
 from sklearn.decomposition import FastICA
 from sklearn.preprocessing import StandardScaler
+from scipy.ndimage import gaussian_filter
 from scipy.linalg import eigh
 import pywt
 import csv
@@ -18,7 +19,7 @@ Helper functions used inside other functions
 def closest(list, k): 
      list = np.asarray(list)
      idx = (np.abs(list - k)).argmin()
-     print(list[idx])
+    #  print(list[idx])
      print('func closest -- success')
      return idx
 
@@ -29,11 +30,11 @@ def find_wavelength(input):
 
 def crop_raster(raster):
     height, width, num_bands = raster.shape
-    top_h = round(height*0.8)
-    bottom_h = round(height*0.2)
-    print(top_h)
-    top_w = round(width*0.8)
-    bottom_w = round(width*0.2)
+    top_h = round(height*0.75)
+    bottom_h = round(height*0.25)
+    # print(top_h)
+    top_w = round(width*0.75)
+    bottom_w = round(width*0.25)
     spatial_subset = raster[bottom_h:top_h, bottom_w:top_w, 0:num_bands]  
     return spatial_subset 
 #-------------------------------------------------------------------------------------------------------------------------------#
@@ -61,7 +62,7 @@ def spectral_subset(median_blurred, wavelengths):
     # Subset the hypercube
     subset_hypercube = median_blurred[:, :, subset_indices]
     wavelengths = wavelengths[subset_indices]
-    print(wavelengths)
+    # print(wavelengths)
     print('func subset_wavelengths -- success')
     return [subset_hypercube, wavelengths]
 
@@ -111,23 +112,64 @@ def find_indices_for_wavelength(wavelengths, wavelength):
 '''
 def calculate_NDVI(red_reflectance, NIR_reflectance):
     # Compute NDVI
+    #NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
+    #NDVI = (1- red_reflectance/NIR_reflectance)*(1+red_reflectance/NIR_reflectance)
+    print(red_reflectance.shape)
     NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
-    print(NDVI)
+    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_raw.txt', NDVI)
+    print('NDVI shape is: ', NDVI.shape)
+    NDVI_minus_background = post_processing(NDVI)
+    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
+    print(NDVI_minus_background)
     # Display NDVI image
     plt.imshow(NDVI, cmap='RdYlGn')
     plt.colorbar()
-    plt.title('NDVI Image')
+    plt.title('NDVI Image Raw')
+    plt.show()
+
+    plt.imshow(NDVI_minus_background, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('NDVI Image Remove Background')
     plt.show()
     print('func calculate_NDVI -- success')
-    return NDVI
+    return NDVI_minus_background
 
+def calculate_EVI(red, nir, blue):
+    G = 2.5
+    C1 = 6
+    C2 = 7.5
+    L = 1
+    evi = G * (nir - red) / (nir + C1 * red - C2 * blue + L)
+    # print(evi)
+    evi_post_processed = post_processing(evi)
+    plt.imshow(evi_post_processed, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('EVI Image')
+    plt.show()
+    return evi_post_processed
+
+'''
+Post-processing
+-- Masking non-vegetated Areas
+-- Gaussian filter: spatial filtering 
+'''
+def post_processing(array):
+    vegetated = array > 0.2 
+    masked_vegetated = array * vegetated
+    gaussian = gaussian_filter(masked_vegetated, sigma=1)
+    return gaussian
+
+
+def bootstrapping(indices): 
+    matrix = np.zeros(10,10)
+    return matrix
 '''
 6. Classifies grass/dirt based on threshold input
 - Classifies live/healthy grass based on threshold 0.6, reference: https://www.nature.com/articles/s41597-023-02255-3#Sec1 
 '''
 def classify_dirt_grass(NDVI): 
     # Threshold NDVI to classify grass and dirt
-    ndvi_threshold = 0.2  # Example threshold; values above 0.2 are considered grass
+    ndvi_threshold = 0.25 # Example threshold; values above 0.2 are considered grass
     grass_mask = NDVI > ndvi_threshold
     # Visualize the classification result
     plt.imshow(grass_mask, cmap='gray')
@@ -137,54 +179,74 @@ def classify_dirt_grass(NDVI):
     return grass_mask 
 
 print("Processing")
-target = r'C:\Users\RDCRLAAU\Desktop\Backup\overlapped_SWIR_VNIR\VNIR\GH_20231213\1_1_20231213_2023_12_13_07_44_08'
+
+# Dead grass
+#target = r'C:\Users\RDCRLAAU\Desktop\Backup\overlapped_SWIR_VNIR\VNIR\GH_20231213\1_1_20231213_2023_12_13_07_44_08'
+target = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\VNIR\GH_20231213_1_1_20231213_2023_12_13_07_44_08'
+
+
+# Live grass 
+#target = r'D:\VNIR\GH_20231116\15_2_20231116_2023_11_16_10_50_03'
 metadata = 'raw_rd_rf.hdr'
 hyperspectral = 'raw_rd_rf'
 
 os.chdir(target)
 
 [vnir_data, vnir, wavelengths] = open_hyperspectral_data(target, metadata, hyperspectral)
-
-plt.imshow(vnir_data[:, :, 100], cmap='gray')
-plt.title('Original')
-plt.colorbar(label='Intensity')
-plt.show()
+print('vnir_data shape: ', vnir_data.shape)
+# plt.imshow(vnir_data[:, :, 100], cmap='gray')
+# plt.title('Original')
+# plt.colorbar(label='Intensity')
+# plt.show()
 
 blurred = smoothing_and_blurring(vnir_data)
+print('median blurring: ', blurred.shape)
+# plt.imshow(blurred[:,:,100], cmap='gray')
+# plt.title('Median Filtering')
+# plt.colorbar(label='Intensity')
+# plt.show()
 
-plt.imshow(blurred[:,:,100], cmap='gray')
-plt.title('Median Filtering')
-plt.colorbar(label='Intensity')
-plt.show()
 
-
-[subsetted_hypercube, wavelengths] = spectral_subset(blurred, wavelengths)
+[subsetted_hypercube, wavelengths] = spectral_subset(vnir_data, wavelengths)
 
 
 red_wavelength = (625+740)/2
 NIR_wavelength = (780+1000)/2
+blue_wavelength = (450+495)/2
 
 red_band = find_indices_for_wavelength(wavelengths, red_wavelength)
 print('Red band number: ', red_band)
 # Extract the red and NIR bands
 red = subsetted_hypercube[:, :, red_band]
 # Displays red band
-plt.imshow(red, cmap='gray')
-plt.title('Red Band')
-plt.colorbar(label='Intensity')
-plt.show()
+# plt.imshow(red, cmap='gray')
+# plt.title('Red Band')
+# plt.colorbar(label='Intensity')
+# plt.show()
 
 
 NIR_band = find_indices_for_wavelength(wavelengths, NIR_wavelength)
 print('NIR band number: ', NIR_band)
 nir = subsetted_hypercube[:, :, NIR_band]
 # Displays red band
-plt.imshow(nir, cmap='gray')
-plt.title('NIR Band')
-plt.colorbar(label='Intensity')
-plt.show()
+# plt.imshow(nir, cmap='gray')
+# plt.title('NIR Band')
+# plt.colorbar(label='Intensity')
+# plt.show()
+
+
+blue_band = find_indices_for_wavelength(wavelengths, blue_wavelength)
+print('Blue band number: ', blue_band)
+blue = subsetted_hypercube[:, :, blue_band]
+# Displays red band
+# plt.imshow(blue, cmap='gray')
+# plt.title('Blue Band')
+# plt.colorbar(label='Intensity')
+# plt.show()
 
 
 NDVI = calculate_NDVI(red, nir)
 
+EVI = calculate_EVI(red, nir, blue)
 grass_classified = classify_dirt_grass(NDVI)
+grass_classified = classify_dirt_grass(EVI)
