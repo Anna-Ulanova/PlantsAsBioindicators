@@ -39,11 +39,12 @@ def find_wavelength(input):
 
 def crop_raster(raster):
     height, width, num_bands = raster.shape
-    top_h = round(height*0.8)
-    bottom_h = round(height*0.2)
+    percent = 0.25
+    top_h = round(height*(1-percent))
+    bottom_h = round(height*percent)
     # print(top_h)
-    top_w = round(width*0.8)
-    bottom_w = round(width*0.2)
+    top_w = round(width*(1-percent))
+    bottom_w = round(width*percent)
     spatial_subset = raster[bottom_h:top_h, bottom_w:top_w, 0:num_bands]  
     return spatial_subset 
 #-------------------------------------------------------------------------------------------------------------------------------#
@@ -121,15 +122,11 @@ def find_indices_for_wavelength(wavelengths, wavelength):
 '''
 def calculate_NDVI(red_reflectance, NIR_reflectance):
     # Compute NDVI
-    #NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
-    #NDVI = (1- red_reflectance/NIR_reflectance)*(1+red_reflectance/NIR_reflectance)
-    print(red_reflectance.shape)
     NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
     # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_raw.txt', NDVI)
     print('NDVI shape is: ', NDVI.shape)
     NDVI_minus_background = post_processing(NDVI)
-    # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
-    print(NDVI_minus_background)
+    #np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
     # Display raw NDVI image
     # plt.imshow(NDVI, cmap='RdYlGn')
     # plt.colorbar()
@@ -159,7 +156,7 @@ def calculate_EVI(red, nir, blue):
 
 '''
 Post-processing
--- Masking non-vegetated Areas
+-- Masking non-vegetated Areass
 -- Gaussian filter: spatial filtering 
 '''
 def post_processing(array):
@@ -188,6 +185,7 @@ def bootstrapping(indices):
             i=i+1
             overall_mat= np.concatenate([overall_mat,sub_array], axis=0)
     print('sampled bootstrapped array: ', overall_mat.shape)
+    print(sub_array)
     NDVI_average = np.concatenate(overall_mat).sum()/(square_side*square_side*num_resamples)
     return NDVI_average
 '''
@@ -205,93 +203,95 @@ def classify_dirt_grass(NDVI):
     print('func classify_dirt_grass -- success')
     return grass_mask 
 
-print("Processing")
+def main_launch(target):
 
-# Dead grass
-target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\\GH_20231213_1_1_20231213_2023_12_13_07_44_08'
-# target = 'C:\\Users\\RDCRLAAU\\Desktop\\Plant as bioindicators\\VNIR\\GH_20230724_12_1_20230724_2023_07_24_12_07_56'
-# target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20230726_3_2_20230726_2023_07_26_09_41_37'
-# target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20230822_9_2_20230822_2023_08_22_07_09_53'
-# target = 'C:\\Users\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20231116_6_1_20231116_2023_11_16_07_07_28'
-# target = 'C:\\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\GH_20231116_15_2_20231116_2023_11_16_10_50_03'
-# target = 'C:\Users\\RDCRLAAU\Desktop\\Plant as bioindicators\\VNIR\\GH_20231121_3_3_20231121_2023_11_21_08_52_18'
-# Live grass 
-#target = r'D:\VNIR\GH_20231116\15_2_20231116_2023_11_16_10_50_03'
-metadata = 'raw_rd_rf.hdr'
-hyperspectral = 'raw_rd_rf'
+    print("---------Processing---------")
+    metadata = 'raw_rd_rf.hdr'
+    hyperspectral = 'raw_rd_rf'
 
-os.chdir(target)
+    [vnir_data, vnir, wavelengths] = open_hyperspectral_data(target, metadata, hyperspectral)
+    print('vnir_data shape: ', vnir_data.shape)
+    # plt.imshow(vnir_data[:, :, 100], cmap='gray')
+    # plt.title('Original')
+    # plt.colorbar(label='Intensity')
+    # plt.show()
 
-[vnir_data, vnir, wavelengths] = open_hyperspectral_data(target, metadata, hyperspectral)
-print('vnir_data shape: ', vnir_data.shape)
-# plt.imshow(vnir_data[:, :, 100], cmap='gray')
-# plt.title('Original')
-# plt.colorbar(label='Intensity')
-# plt.show()
+    blurred = smoothing_and_blurring(vnir_data)
+    print('median blurring: ', blurred.shape)
+    # plt.imshow(blurred[:,:,100], cmap='gray')
+    # plt.title('Median Filtering')
+    # plt.colorbar(label='Intensity')
+    # plt.show()
 
-blurred = smoothing_and_blurring(vnir_data)
-print('median blurring: ', blurred.shape)
-# plt.imshow(blurred[:,:,100], cmap='gray')
-# plt.title('Median Filtering')
-# plt.colorbar(label='Intensity')
-# plt.show()
+    [subsetted_hypercube, wavelengths] = spectral_subset(blurred, wavelengths)
 
+    red_wavelength = (625+740)/2
+    NIR_wavelength = (780+1000)/2
+    blue_wavelength = (450+495)/2
 
-[subsetted_hypercube, wavelengths] = spectral_subset(blurred, wavelengths)
+    red_band = find_indices_for_wavelength(wavelengths, red_wavelength)
+    print('Red band number: ', red_band)
+    # Extract the red and NIR bands
+    red = subsetted_hypercube[:, :, red_band]
+    # Displays red band
+    # plt.imshow(red, cmap='gray')
+    # plt.title('Red Band')
+    # plt.colorbar(label='Intensity')
+    # plt.show()
 
+    NIR_band = find_indices_for_wavelength(wavelengths, NIR_wavelength)
+    print('NIR band number: ', NIR_band)
+    nir = subsetted_hypercube[:, :, NIR_band]
+    # Displays red band
+    # plt.imshow(nir, cmap='gray')
+    # plt.title('NIR Band')
+    # plt.colorbar(label='Intensity')
+    # plt.show()
 
-red_wavelength = (625+740)/2
-NIR_wavelength = (780+1000)/2
-blue_wavelength = (450+495)/2
+    blue_band = find_indices_for_wavelength(wavelengths, blue_wavelength)
+    print('Blue band number: ', blue_band)
+    blue = subsetted_hypercube[:, :, blue_band]
+    # Displays red band
+    # plt.imshow(blue, cmap='gray')
+    # plt.title('Blue Band')
+    # plt.colorbar(label='Intensity')
+    # plt.show()
 
-red_band = find_indices_for_wavelength(wavelengths, red_wavelength)
-print('Red band number: ', red_band)
-# Extract the red and NIR bands
-red = subsetted_hypercube[:, :, red_band]
-# Displays red band
-# plt.imshow(red, cmap='gray')
-# plt.title('Red Band')
-# plt.colorbar(label='Intensity')
-# plt.show()
+    NDVI = calculate_NDVI(red, nir)
+    EVI = calculate_EVI(red, nir, blue)
 
+    NDVI_averaged = bootstrapping(NDVI)
+    EVI_averaged = bootstrapping(EVI)
 
-NIR_band = find_indices_for_wavelength(wavelengths, NIR_wavelength)
-print('NIR band number: ', NIR_band)
-nir = subsetted_hypercube[:, :, NIR_band]
-# Displays red band
-# plt.imshow(nir, cmap='gray')
-# plt.title('NIR Band')
-# plt.colorbar(label='Intensity')
-# plt.show()
+    results_doc_dir = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages.txt'
+    append_new = target +'\t'+str(NDVI_averaged)+'\t'+str(EVI_averaged)
+    # Open the file in append & read mode ('a+')
+    with open(results_doc_dir, "a+") as file_object:
+        # Move read cursor to the start of file.
+        file_object.seek(0)
+        # If file is not empty then append '\n'
+        data = file_object.read(100)
+        if len(data) > 0 :
+            file_object.write("\n")
+        # Append text at the end of file
+        file_object.write(append_new)
 
+#####################################################################################################################################
 
-blue_band = find_indices_for_wavelength(wavelengths, blue_wavelength)
-print('Blue band number: ', blue_band)
-blue = subsetted_hypercube[:, :, blue_band]
-# Displays red band
-# plt.imshow(blue, cmap='gray')
-# plt.title('Blue Band')
-# plt.colorbar(label='Intensity')
-# plt.show()
-
-
-NDVI = calculate_NDVI(red, nir)
-EVI = calculate_EVI(red, nir, blue)
-grass_classified = classify_dirt_grass(NDVI)
-grass_classified = classify_dirt_grass(EVI)
-
-NDVI_averaged = bootstrapping(NDVI)
-EVI_averaged = bootstrapping(EVI)
-
-results_doc_dir = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages.txt'
-append_new = target +'\t'+str(NDVI_averaged)+'\t'+str(EVI_averaged)
-# Open the file in append & read mode ('a+')
-with open(results_doc_dir, "a+") as file_object:
-    # Move read cursor to the start of file.
-    file_object.seek(0)
-    # If file is not empty then append '\n'
-    data = file_object.read(100)
-    if len(data) > 0 :
-        file_object.write("\n")
-    # Append text at the end of file
-    file_object.write(append_new)
+# Change to the location of the folder that has the VNIR files
+directory = 'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\VNIR'
+vnir_files = []
+summary_file = [('File_Name', 'NDVI Summary', 'EVI Summary')]
+filename = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages.txt'
+with open(filename, 'w') as file:
+    for row in summary_file:
+        # Join the elements of the tuple with tabs and write to the file
+        file.write('\t'.join(map(str, row)) + '\n')
+        
+for root, dirs, files in os.walk(directory):
+    for file in files:
+        file_path = os.path.join(root, file)
+        if "VNIR" in file_path:
+            vnir_files.append(file_path)
+for vnir in vnir_files: 
+    main_launch(vnir)
