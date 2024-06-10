@@ -12,9 +12,9 @@ from scipy.linalg import eigh
 import pywt
 import csv
 import cv2
-#-------------------------------------------------------------------------------------------------------------------------------#
+#-----------------------------------------Helper functions used inside other functions-----------------------------------------#
 '''
-Helper functions used inside other functions 
+
 '''
 def convert_2D(subsetted_hypercube):
 
@@ -25,21 +25,9 @@ def convert_2D(subsetted_hypercube):
     print('func convert_2D -- success')
     return reshaped_data 
 
-def closest(list, k): 
-     list = np.asarray(list)
-     idx = (np.abs(list - k)).argmin()
-    #  print(list[idx])
-     print('func closest -- success')
-     return idx
-
-def find_wavelength(input):
-    wavelengths = np.array(input.metadata['wavelength'])
-    wavelengths = wavelengths.astype(float)
-    return wavelengths
-
 def crop_raster(raster):
     height, width, num_bands = raster.shape
-    percent = 0.25
+    percent = 0.20
     top_h = round(height*(1-percent))
     bottom_h = round(height*percent)
     # print(top_h)
@@ -49,7 +37,8 @@ def crop_raster(raster):
     return spatial_subset 
 #-------------------------------------------------------------------------------------------------------------------------------#
 '''
-Opens the hyperspectral data
+1. Opens the hyperspectral data, retrieves wavelengths associated with each band, crops the raster files by a 20% margin. 
+- This function returns a hypercube array, raw raster file, and an array of wavelength per band
 '''
 def open_hyperspectral_data(target, metadata, hyperspectral): 
     vnir = envi.open(os.path.join(target, metadata), os.path.join(target, hyperspectral))
@@ -62,26 +51,25 @@ def open_hyperspectral_data(target, metadata, hyperspectral):
 #-------------------------------------------------------------------------------------------------------------------------------#
 
 '''
-1. Spectral subset of VNIR files for atmospheric correction
-- Adjusting for the effects of the atmosphere on the captured data, ensuring the spectral information accurately represents the ground.
+2. Spectral subset of VNIR files for atmospheric correction
+- Adjusting for the effects of the atmosphere on the captured data, ensuring the spectral information accurately represents the ground. 
+- Returns the subsetting hypercube and subsetted array of the wavelegnth/band
 '''
 def spectral_subset(median_blurred, wavelengths): 
     # Find bands with wavelengths less than or equal to max_wavelength
     subset_indices = np.where(wavelengths <=920.00)[0]
-    print(subset_indices)
     # Subset the hypercube
     subset_hypercube = median_blurred[:, :, subset_indices]
+    # Subset the wavelengths
     wavelengths = wavelengths[subset_indices]
-    # print(wavelengths)
     print('func subset_wavelengths -- success')
     return [subset_hypercube, wavelengths]
 
 
 '''
 3. Smoothing- Median filtering to remove the "salt and pepper" noise. 
-- Draws a 9 x 9 matrix around each element and determines the median value 
-- Output matrix has the same dimensions as the input matrix 
-- Moved up earlier because the dimensions remain, unsure how to handle data types
+- Draws a 3 x 3 matrix around each element and determines the median value 
+- Output matrix has the same dimensions as the input matrix, returns a hypercube
 '''
 def smoothing_and_blurring(vnir_array):
     height, width, num_bands = vnir_array.shape
@@ -89,7 +77,6 @@ def smoothing_and_blurring(vnir_array):
     filtered3D = np.dstack(blurred_matrices)
     print('Filtered Array ', filtered3D.shape)
     return filtered3D
-    
 
 '''
 4. Finds the indices of bands that have wavelengths corresponding to red/NIR
@@ -99,98 +86,135 @@ def smoothing_and_blurring(vnir_array):
 - Uses helper function closest to find the wavelength value closest to the average of the range
 '''
 def find_indices_for_wavelength(wavelengths, wavelength):
-    """
-    Find the indices of "red" bands in hyperspectral data.
-
-    Args:
-        wavelengths (ndarray): Array of wavelengths.
-        wavelength_range (tuple): Tuple containing the lower and upper bounds of the "red" wavelength range.
-
-    Returns:
-        list: List of indices corresponding to "red" bands.
-    """
-    close_in_list = closest(wavelengths, wavelength)
-    # Use list comprehension to return index where the wavelength is found in list
+    list = np.asarray(wavelengths)
+    idx = (np.abs(list - wavelength)).argmin()
     print('func find_indices_for_wavelength -- success')
-    return close_in_list
-
+    return idx
 
 ''' 
-5. Calculate NDIV using the red and NIR band indices
-- Uses the first red/NIR band 
-- Define the indices for the red and NIR bands 
+5A. Calculate NDVI using the red and NIR band indices
+- Uses conventional NDVI formula, sends raw NDVI for background filtering and Gaussian blurring: 
+- Unsave regions to view raw and processed NDVI for data
+- NDVI highlights:
+    - Chlorophyll sensitive 
+    - Quantifies plant density and health 
+
 '''
 def calculate_NDVI(red_reflectance, NIR_reflectance):
     # Compute NDVI
     NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
+
+    # Saves indices associated with each pixel of the raw NDVI matrix 
     # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_raw.txt', NDVI)
-    print('NDVI shape is: ', NDVI.shape)
+    
+    # Sends for background processing where the NDVI values that are 0.2 or below are converted to zero, and then Gaussian blur is applied
     NDVI_minus_background = post_processing(NDVI)
-    #np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
+
+    # Saves indices associated with each pixel post processing, meaning that background noise will be predominantly zero
+    # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
+
     # Display raw NDVI image
     # plt.imshow(NDVI, cmap='RdYlGn')
     # plt.colorbar()
     # plt.title('NDVI Image Raw')
     # plt.show()
-    # Display NDVI image without background
-    plt.imshow(NDVI_minus_background, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('NDVI Image Remove Background')
-    plt.show()
-    print('func calculate_NDVI -- success')
-    return NDVI_minus_background
 
+    # Display NDVI image without background
+    # plt.imshow(NDVI_minus_background, cmap='RdYlGn')
+    # plt.colorbar()
+    # plt.title('NDVI Image Remove Background')
+    # plt.show()
+    # print('func calculate_NDVI -- success')
+    return NDVI_minus_background
+''' 
+5B Calculate EVI using the red, blue, and NIR band indices
+- Uses constants outlined in: https://doi.org/10.3390/s7112636
+- EVI highlights:
+    - Responsive to canopy structural variations leaf area index
+    - Canopy type and architecture
+    - Plant physiognomy
+    - Uses blue band to correct for atmosphere
+    - Reduces effects of soil background
+'''
 def calculate_EVI(red, nir, blue):
     G = 2.5
     C1 = 6
     C2 = 7.5
     L = 1
     evi = G * (nir - red) / (nir + C1 * red - C2 * blue + L)
-    # print(evi)
     evi_post_processed = post_processing(evi)
-    plt.imshow(evi_post_processed, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('EVI Image')
-    plt.show()
+    # Uncomment to see EVI output
+    # plt.imshow(evi_post_processed, cmap='RdYlGn')
+    # plt.colorbar()
+    # plt.title('EVI Image')
+    # plt.show()
     return evi_post_processed
 
 '''
-Post-processing
--- Masking non-vegetated Areass
--- Gaussian filter: spatial filtering 
+6. Post-processing
+- Masking non-vegetated Areas by assigning any index values above 0.2 as vegetative areas
+- Gaussian filter: spatial filtering 
 '''
 def post_processing(array):
-    vegetated = array > 0.2 
+    # Change this value if analyzing overall grass/healthy grass. 
+    vegetated = array > 0.25 
     masked_vegetated = array * vegetated
     gaussian = gaussian_filter(masked_vegetated, sigma=1)
     return gaussian
 
 '''
-Bootstrapping output matrix
--- Resamples a 10 by 10 matrix that does not contain zeros and 
+7. Bootstrapping output matrix
+- Resamples a 10 by 10 matrix that does not contain zeros 1000 times
+- Appends all resampled matrices together, finds the total sum of the matrix: 10000 by 10 added up to one number, and then divided by 100000
+- Returns the average index value
 '''
 def bootstrapping(indices): 
+    # Number of resamples completed
     num_resamples = 1000
+    # Assigns dimensions of the sample matrix, specifies the length of one matrix
     square_side = 10 
+    # Finds the number of rows and columns of the input index matrix.
     row, col = indices.shape
-    row_lim = row-10 
-    col_lim = col -10
+    # Cuts off the maximum row number by 10 for picking random points within the index matrix. 
+    row_lim = row- 10 
+    col_lim = col - 10
+    # Loop iteration counter
     i= 0
+    # Creates an empty zeros 1 by 10 matrix
     overall_mat = np.zeros((1, 10))
-    while i  <num_resamples:
+    # Creates a random row number from 10, to row maximux number and a random column number from the same range, creating a random point within the index matrix
+    # Uses the random point in matrix to create the resampling sub-matrix. Treats the random point as the bottom left corner, see below:
+    #    ----------
+    #   |          |
+    #   |          |
+    #   |          |
+    #   |          |
+    #  (*)---------
+    while i < num_resamples:
+        # Finds random row number
         random_row_point = np.random.randint(10, row_lim)
+        print(random_row_point)
+        # Finds random column number
         random_col_point = np.random.randint(10, col_lim)
+        print(random_col_point)
+        # Creates sampling sub-matrix
         sub_array = indices[random_row_point:(random_row_point + square_side), random_col_point:(random_col_point + square_side)]
+        # Makes sure that none of the elements inside the matrix are zero
         if 0 not in sub_array:
             i=i+1
+            # If matrix does not contain zeroes, the counter increases by one and the sampled matrix is vertically appended to 
+            # the overall matrix
             overall_mat= np.concatenate([overall_mat,sub_array], axis=0)
     print('sampled bootstrapped array: ', overall_mat.shape)
     print(sub_array)
+    # Calculates the sum of every sampled cell and divides by the number of sampled cells (1000*100)
     NDVI_average = np.concatenate(overall_mat).sum()/(square_side*square_side*num_resamples)
+    # Returns a single number
     return NDVI_average
 '''
-6. Classifies grass/dirt based on threshold input
+8. Classifies grass/dirt based on threshold input
 - Classifies live/healthy grass based on threshold 0.6, reference: https://www.nature.com/articles/s41597-023-02255-3#Sec1 
+- Classification shows exactly how much of the soil sample is getting classified as total/healthy grass. 
 '''
 def classify_dirt_grass(NDVI): 
     # Threshold NDVI to classify grass and dirt
@@ -209,26 +233,34 @@ def main_launch(target):
     metadata = 'raw_rd_rf.hdr'
     hyperspectral = 'raw_rd_rf'
 
+    # Opens hyperspectral data, crops 20% from all four sides, finds the wavelength list associated with each band
     [vnir_data, vnir, wavelengths] = open_hyperspectral_data(target, metadata, hyperspectral)
-    print('vnir_data shape: ', vnir_data.shape)
+
+    # Uncomment to display the hyperspectral image
     # plt.imshow(vnir_data[:, :, 100], cmap='gray')
     # plt.title('Original')
     # plt.colorbar(label='Intensity')
     # plt.show()
 
+    # Completes median filtering using a 3 x 3 matrix
     blurred = smoothing_and_blurring(vnir_data)
-    print('median blurring: ', blurred.shape)
+
+    # Uncomment to display the hyperspectral image
     # plt.imshow(blurred[:,:,100], cmap='gray')
     # plt.title('Median Filtering')
     # plt.colorbar(label='Intensity')
     # plt.show()
 
+    # Completes spectral subset which removes any bands that have a wavelength greater than 920 nm associated with it 
     [subsetted_hypercube, wavelengths] = spectral_subset(blurred, wavelengths)
 
+    # Finds average wavelengths for each band type
     red_wavelength = (625+740)/2
     NIR_wavelength = (780+1000)/2
     blue_wavelength = (450+495)/2
 
+
+    # Finds the index for red wavelength. Uses helper functions to determine the nearest wavelength for the band. 
     red_band = find_indices_for_wavelength(wavelengths, red_wavelength)
     print('Red band number: ', red_band)
     # Extract the red and NIR bands
@@ -257,13 +289,14 @@ def main_launch(target):
     # plt.colorbar(label='Intensity')
     # plt.show()
 
+
     NDVI = calculate_NDVI(red, nir)
     EVI = calculate_EVI(red, nir, blue)
 
     NDVI_averaged = bootstrapping(NDVI)
     EVI_averaged = bootstrapping(EVI)
-
-    results_doc_dir = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages.txt'
+    # CHANGE DIRECTORY TO LOCAL MACHINE
+    results_doc_dir = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages_cropped20.txt'
     append_new = target +'\t'+str(NDVI_averaged)+'\t'+str(EVI_averaged)
     # Open the file in append & read mode ('a+')
     with open(results_doc_dir, "a+") as file_object:
@@ -279,19 +312,27 @@ def main_launch(target):
 #####################################################################################################################################
 
 # Change to the location of the folder that has the VNIR files
-directory = 'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\VNIR'
+print('Script Initiated...')
+# CHANGE DIRECTORY TO LOCAL MACHINE
+directory = 'C:\\Users\\RDCRLAAU\\Desktop\\Plant as bioindicators\\VNIR'
 vnir_files = []
 summary_file = [('File_Name', 'NDVI Summary', 'EVI Summary')]
-filename = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages.txt'
+# CHANGE DIRECTORY TO LOCAL MACHINE
+filename = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages_cropped20.txt'
+
+# Creates a summary document which saves the average NDVI/EVI for hyperspectral data. 
 with open(filename, 'w') as file:
     for row in summary_file:
         # Join the elements of the tuple with tabs and write to the file
         file.write('\t'.join(map(str, row)) + '\n')
-        
+
+# Finds the directories of all VNIR files, returns only the folder where the raw_rd_rf files are saved
 for root, dirs, files in os.walk(directory):
-    for file in files:
-        file_path = os.path.join(root, file)
+    for dir in dirs:
+        file_path = os.path.join(root, dir)
         if "VNIR" in file_path:
             vnir_files.append(file_path)
+
+# Launches main function. The main function calls on other subfunctions that complete specific analyses. 
 for vnir in vnir_files: 
     main_launch(vnir)
