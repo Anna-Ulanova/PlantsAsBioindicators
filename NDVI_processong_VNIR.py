@@ -114,16 +114,16 @@ def calculate_NDVI(red_reflectance, NIR_reflectance):
     np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
 
     # Display raw NDVI image
-    plt.imshow(NDVI, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('NDVI Image Raw')
-    plt.show()
+    # plt.imshow(NDVI, cmap='RdYlGn')
+    # plt.colorbar()
+    # plt.title('NDVI Image Raw')
+    # plt.show()
 
     # Display NDVI image without background
-    plt.imshow(NDVI_minus_background, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('NDVI Image Remove Background')
-    plt.show()
+    # plt.imshow(NDVI_minus_background, cmap='RdYlGn')
+    # plt.colorbar()
+    # plt.title('NDVI Image Remove Background')
+    # plt.show()
     print('func calculate_NDVI -- success')
     soil_element_isolation(NDVI_minus_background)
     return NDVI_minus_background
@@ -145,10 +145,10 @@ def calculate_EVI(red, nir, blue):
     evi = G * (nir - red) / (nir + C1 * red - C2 * blue + L)
     evi_post_processed = post_processing(evi)
     # Uncomment to see EVI output
-    plt.imshow(evi_post_processed, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('EVI Image')
-    plt.show()
+    # plt.imshow(evi_post_processed, cmap='RdYlGn')
+    # plt.colorbar()
+    # plt.title('EVI Image')
+    # plt.show()
     return evi_post_processed
 
 '''
@@ -172,30 +172,15 @@ live grass = 0.5-1
 '''
 def soil_element_isolation(array):
     print(array.shape)
-    soil1 = 0.2<array
-    soil2 = soil1<0.35
-    masked_soil = array*soil2
-    print(masked_soil.shape)
+    # array = np.where((array<0.2),array,0)
+    
+    # array = np.where((array>0.21)&(array<0.35), array, 0.25)
 
-    plt.imshow(masked_soil, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('Soil only?')
-    plt.show()
+    array = np.where((array>0.35)&(array<0.5),array,0.5)
 
-    dead_grass1 = array>0.35  
-    dead_grass2 = dead_grass1<0.5
-    masked_dead_grass = dead_grass2*array
+    # array = np.where((array>0.51),array,0.75)
 
-    plt.imshow(masked_dead_grass, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title('Dead grass only?')
-    plt.show()
-
-    alive_grass1 = array>0.5 
-    alive_grass2 = alive_grass1<1
-    masked_alive_grass = alive_grass2*array
-
-    plt.imshow(masked_alive_grass, cmap='RdYlGn')
+    plt.imshow(array, cmap='RdYlGn')
     plt.colorbar()
     plt.title('Alive grass?')
     plt.show()
@@ -307,11 +292,6 @@ def main_launch(target):
     # plt.show()
 
 
-#######DELETE
-    plt.hist(red, bins='auto')
-    plt.title('Spread of Red Reflectance Intensities')
-    plt.show()
-##############
     NIR_band = find_indices_for_wavelength(wavelengths, NIR_wavelength)
     print('NIR band number: ', NIR_band)
     nir = subsetted_hypercube[:, :, NIR_band]
@@ -321,11 +301,6 @@ def main_launch(target):
     # plt.colorbar(label='Intensity')
     # plt.show()
 
-#######DELETE
-    plt.hist(nir, bins='auto')
-    plt.title('Spread of NIR Reflectance Intensities')
-    plt.show()
-##############
     blue_band = find_indices_for_wavelength(wavelengths, blue_wavelength)
     print('Blue band number: ', blue_band)
     blue = subsetted_hypercube[:, :, blue_band]
@@ -335,8 +310,6 @@ def main_launch(target):
     # plt.colorbar(label='Intensity')
     # plt.show()
 
-    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\red_band.txt', red)
-    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\nir_band.txt', nir)
     NDVI = calculate_NDVI(red, nir)
     EVI = calculate_EVI(red, nir, blue)
 
@@ -379,15 +352,13 @@ with open(filename, 'w') as file:
     for row in summary_file:
         # Join the elements of the tuple with tabs and write to the file
         file.write('\t'.join(map(str, row)) + '\n')
-print('Summary document for NDVI averages created')
+        
 # Finds the directories of all VNIR files, returns only the folder where the raw_rd_rf files are saved
 for (root, dirs, files) in os.walk(directory, topdown=True):
     for dir in dirs:
         file_path = os.path.join(root, dir)
         if "VNIR" in file_path:
-            print(file_path)
             vnir_files.append(file_path)
-print('VNIR directories recovered: ', '\n', vnir_files)
 
 main_launch(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\VNIR\16_3_20230724_2023_07_24_13_10_38')
 # # Launches main function. The main function calls on other subfunctions that complete specific analyses. 
