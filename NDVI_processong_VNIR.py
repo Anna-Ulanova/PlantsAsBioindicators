@@ -27,7 +27,7 @@ def convert_2D(subsetted_hypercube):
 
 def crop_raster(raster):
     height, width, num_bands = raster.shape
-    percent = 0.20
+    percent = 0
     top_h = round(height*(1-percent))
     bottom_h = round(height*percent)
     # print(top_h)
@@ -105,26 +105,27 @@ def calculate_NDVI(red_reflectance, NIR_reflectance):
     NDVI = (NIR_reflectance - red_reflectance) / (NIR_reflectance + red_reflectance)
 
     # Saves indices associated with each pixel of the raw NDVI matrix 
-    # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_raw.txt', NDVI)
+    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\ndvi_raw.txt', NDVI)
     
     # Sends for background processing where the NDVI values that are 0.2 or below are converted to zero, and then Gaussian blur is applied
     NDVI_minus_background = post_processing(NDVI)
 
     # Saves indices associated with each pixel post processing, meaning that background noise will be predominantly zero
-    # np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
+    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\ndvi_no_background.txt', NDVI_minus_background)
 
     # Display raw NDVI image
-    # plt.imshow(NDVI, cmap='RdYlGn')
-    # plt.colorbar()
-    # plt.title('NDVI Image Raw')
-    # plt.show()
+    plt.imshow(NDVI, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('NDVI Image Raw')
+    plt.show()
 
     # Display NDVI image without background
-    # plt.imshow(NDVI_minus_background, cmap='RdYlGn')
-    # plt.colorbar()
-    # plt.title('NDVI Image Remove Background')
-    # plt.show()
-    # print('func calculate_NDVI -- success')
+    plt.imshow(NDVI_minus_background, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('NDVI Image Remove Background')
+    plt.show()
+    print('func calculate_NDVI -- success')
+    soil_element_isolation(NDVI_minus_background)
     return NDVI_minus_background
 ''' 
 5B Calculate EVI using the red, blue, and NIR band indices
@@ -144,10 +145,10 @@ def calculate_EVI(red, nir, blue):
     evi = G * (nir - red) / (nir + C1 * red - C2 * blue + L)
     evi_post_processed = post_processing(evi)
     # Uncomment to see EVI output
-    # plt.imshow(evi_post_processed, cmap='RdYlGn')
-    # plt.colorbar()
-    # plt.title('EVI Image')
-    # plt.show()
+    plt.imshow(evi_post_processed, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('EVI Image')
+    plt.show()
     return evi_post_processed
 
 '''
@@ -157,11 +158,48 @@ def calculate_EVI(red, nir, blue):
 '''
 def post_processing(array):
     # Change this value if analyzing overall grass/healthy grass. 
-    vegetated = array > 0.25 
+    vegetated = array > 0.10
     masked_vegetated = array * vegetated
     gaussian = gaussian_filter(masked_vegetated, sigma=1)
-    return gaussian
+    return masked_vegetated
 
+
+'''
+6a. NDVI Separation of dead grass vs soil vs live grass
+soil = 0.2-0.35
+dead grass = 0.35-0.5
+live grass = 0.5-1
+'''
+def soil_element_isolation(array):
+    print(array.shape)
+    soil1 = 0.2<array
+    soil2 = soil1<0.35
+    masked_soil = array*soil2
+    print(masked_soil.shape)
+
+    plt.imshow(masked_soil, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('Soil only?')
+    plt.show()
+
+    dead_grass1 = array>0.35  
+    dead_grass2 = dead_grass1<0.5
+    masked_dead_grass = dead_grass2*array
+
+    plt.imshow(masked_dead_grass, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('Dead grass only?')
+    plt.show()
+
+    alive_grass1 = array>0.5 
+    alive_grass2 = alive_grass1<1
+    masked_alive_grass = alive_grass2*array
+
+    plt.imshow(masked_alive_grass, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title('Alive grass?')
+    plt.show()
+    print('Isolated soil core elements--work in progress')
 '''
 7. Bootstrapping output matrix
 - Resamples a 10 by 10 matrix that does not contain zeros 1000 times
@@ -193,10 +231,8 @@ def bootstrapping(indices):
     while i < num_resamples:
         # Finds random row number
         random_row_point = np.random.randint(10, row_lim)
-        print(random_row_point)
         # Finds random column number
         random_col_point = np.random.randint(10, col_lim)
-        print(random_col_point)
         # Creates sampling sub-matrix
         sub_array = indices[random_row_point:(random_row_point + square_side), random_col_point:(random_col_point + square_side)]
         # Makes sure that none of the elements inside the matrix are zero
@@ -206,7 +242,6 @@ def bootstrapping(indices):
             # the overall matrix
             overall_mat= np.concatenate([overall_mat,sub_array], axis=0)
     print('sampled bootstrapped array: ', overall_mat.shape)
-    print(sub_array)
     # Calculates the sum of every sampled cell and divides by the number of sampled cells (1000*100)
     NDVI_average = np.concatenate(overall_mat).sum()/(square_side*square_side*num_resamples)
     # Returns a single number
@@ -220,10 +255,10 @@ def classify_dirt_grass(NDVI):
     # Threshold NDVI to classify grass and dirt
     ndvi_threshold = 0.25 # Example threshold; values above 0.2 are considered grass
     grass_mask = NDVI > ndvi_threshold
-    # Visualize the classification result
-    # plt.imshow(grass_mask, cmap='gray')
-    # plt.title('Grass Classification')
-    # plt.show()
+    #Visualize the classification result
+    plt.imshow(grass_mask, cmap='gray')
+    plt.title('Grass Classification')
+    plt.show()
     print('func classify_dirt_grass -- success')
     return grass_mask 
 
@@ -265,21 +300,32 @@ def main_launch(target):
     print('Red band number: ', red_band)
     # Extract the red and NIR bands
     red = subsetted_hypercube[:, :, red_band]
-    # Displays red band
+    ## Displays red band
     # plt.imshow(red, cmap='gray')
     # plt.title('Red Band')
     # plt.colorbar(label='Intensity')
     # plt.show()
 
+
+#######DELETE
+    plt.hist(red, bins='auto')
+    plt.title('Spread of Red Reflectance Intensities')
+    plt.show()
+##############
     NIR_band = find_indices_for_wavelength(wavelengths, NIR_wavelength)
     print('NIR band number: ', NIR_band)
     nir = subsetted_hypercube[:, :, NIR_band]
-    # Displays red band
+    ## Displays red band
     # plt.imshow(nir, cmap='gray')
     # plt.title('NIR Band')
     # plt.colorbar(label='Intensity')
     # plt.show()
 
+#######DELETE
+    plt.hist(nir, bins='auto')
+    plt.title('Spread of NIR Reflectance Intensities')
+    plt.show()
+##############
     blue_band = find_indices_for_wavelength(wavelengths, blue_wavelength)
     print('Blue band number: ', blue_band)
     blue = subsetted_hypercube[:, :, blue_band]
@@ -289,14 +335,15 @@ def main_launch(target):
     # plt.colorbar(label='Intensity')
     # plt.show()
 
-
+    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\red_band.txt', red)
+    np.savetxt(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\nir_band.txt', nir)
     NDVI = calculate_NDVI(red, nir)
     EVI = calculate_EVI(red, nir, blue)
 
     NDVI_averaged = bootstrapping(NDVI)
     EVI_averaged = bootstrapping(EVI)
     # CHANGE DIRECTORY TO LOCAL MACHINE
-    results_doc_dir = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages_cropped20.txt'
+    results_doc_dir = r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\test_20240807.txt'
     append_new = target +'\t'+str(NDVI_averaged)+'\t'+str(EVI_averaged)
     # Open the file in append & read mode ('a+')
     with open(results_doc_dir, "a+") as file_object:
@@ -314,25 +361,35 @@ def main_launch(target):
 # Change to the location of the folder that has the VNIR files
 print('Script Initiated...')
 # CHANGE DIRECTORY TO LOCAL MACHINE
-directory = 'C:\\Users\\RDCRLAAU\\Desktop\\Plant as bioindicators\\VNIR'
+# Directory where VNIR files would be located.
+# - Testing 8/7/2024: copied items:   D:\VNIR\GH_20230724\16_3_20230724_2023_07_24_13_10_38
+                                    # D:\VNIR\GH_20230726\9_1_20230726_2023_07_26_10_33_15
+                                    # D:\VNIR\GH_20230801\11_3_20230801_2023_08_01_13_07_17
+                                    # D:\VNIR\GH_20230822\7_2_20230822_2023_08_22_06_49_43
+                                    # D:\VNIR\GH_20231114\5_2_20231114_2023_11_14_07_51_18
+directory = r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\VNIR'
+
 vnir_files = []
 summary_file = [('File_Name', 'NDVI Summary', 'EVI Summary')]
 # CHANGE DIRECTORY TO LOCAL MACHINE
-filename = r'C:\Users\RDCRLAAU\Desktop\Plant as bioindicators\PlantsAsBioindicators-Python\summary_NDVI_EVI_averages_cropped20.txt'
+filename = r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\test_20240807.txt'
 
 # Creates a summary document which saves the average NDVI/EVI for hyperspectral data. 
 with open(filename, 'w') as file:
     for row in summary_file:
         # Join the elements of the tuple with tabs and write to the file
         file.write('\t'.join(map(str, row)) + '\n')
-
+print('Summary document for NDVI averages created')
 # Finds the directories of all VNIR files, returns only the folder where the raw_rd_rf files are saved
-for root, dirs, files in os.walk(directory):
+for (root, dirs, files) in os.walk(directory, topdown=True):
     for dir in dirs:
         file_path = os.path.join(root, dir)
         if "VNIR" in file_path:
+            print(file_path)
             vnir_files.append(file_path)
+print('VNIR directories recovered: ', '\n', vnir_files)
 
-# Launches main function. The main function calls on other subfunctions that complete specific analyses. 
-for vnir in vnir_files: 
-    main_launch(vnir)
+main_launch(r'C:\Users\RDCRLAAU\Desktop\Plant_as_bioindicators\PlantsAsBioindicators-Python\VNIR\16_3_20230724_2023_07_24_13_10_38')
+# # Launches main function. The main function calls on other subfunctions that complete specific analyses. 
+# for vnir in vnir_files: 
+#     main_launch(vnir)
