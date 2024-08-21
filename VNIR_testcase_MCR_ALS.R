@@ -3,12 +3,12 @@ if (!requireNamespace("ALS", quietly = TRUE)) {
   install.packages("ALS")
 }
 library(ALS)
-library(ggplot2)
+library(raster)
 # This script will complete MCR-ALS
 # https://cran.r-project.org/web/packages/ALS/ALS.pdf
 
 # TEST CASE VNIR
-vnir<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/PlantsAsBioindicators-Python/VNIR/5_2_20231114_2023_11_14_07_51_18/raw_rd_rf')
+vnir<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/PlantsAsBioindicators-Python/VNIR/16_3_20230724_2023_07_24_13_10_38/raw_rd_rf')
 
 # Check dimensions of vnir to ensure it's a 3D array
 dim(vnir)
@@ -17,7 +17,7 @@ dim(vnir)
 vnir_2d <- matrix(vnir, nrow = dim(vnir)[1] * dim(vnir)[2], ncol = dim(vnir)[3])
 
 # Perform PCA on the reshaped data
-pca_result <- prcomp(vnir_2d, center = TRUE, scale. = TRUE)
+pca_result <- prcomp(vnir_2d, scale. = TRUE)
 
 # Extract eigenvalues
 eigenvalues <- pca_result$sdev^2
@@ -29,97 +29,55 @@ abline(h = 1, col = "red", lty = 2)  # Kaiser's rule threshold
 # Uses Kaiser-Guttman rule which suggest that "the elbow" in scree plots occurs
 # when the eigenvalues dip below 1. 
 # https://datasciencewiki.net/kaisers-rule/
-num_components_kaiser <- sum(eigenvalues > 1)
-cat("Number of components determined by Kaiser's rule:", num_components_kaiser, "\n")
+num_components <- sum(eigenvalues > 1)
 
-# Use the number of components determined by PCA or manually adjust based on domain knowledge
-num_components <- num_components_kaiser  
-
-# Initial spectra estimate using PCA
-initial_spectra <- pca_result$rotation[, 1:num_components]
+loadings <-
+  pca_result$rotation[, 1:num_components]  # Loadings (corresponding to pure spectra)
 
 # Create initial concentration profile estimates
 initial_concentration_profiles <- matrix(
   runif(nrow(vnir_2d) * num_components), 
   nrow = nrow(vnir_2d), 
-  ncol = num_components
+  ncol = num_components)
+
+initial_pure_spectra<-loadings
+
+
+mcr_result <- als(
+  CList<-list(initial_concentration_profiles), 
+  PList<-list(vnir_2d),
+  S<-initial_pure_spectra,
+  nonnegC = TRUE,
+  # Non-negativity constraint on concentrations
+  nonnegS = TRUE,
+  # Non-negativity constraint on spectra
+  maxiter = 100,
+  # Maximum number of iterations
+  thresh = 1e-6
 )
 
+# mcr_result$C contains the estimated concentration profiles for each component.
+# [n_samples, n_components]
+# Each column in this matrix corresponds to the concentration profile of one
+# component across all samples. These profiles indicate how the concentration of
+# each pure component varies across the different samples.
+final_concentrations <- mcr_result$C[[1]]
+# mcr_result$S contains the estimated spectral profiles (or pure spectra) for each component.
+# [n_bands, n_components]
+# Purpose: Each column in this matrix corresponds to the spectral profile of one pure component. These profiles represent the characteristic spectra of each pure component across all the spectral bands.
+final_pure_spectra <- mcr_result$S
 
-# Define convergence criteria
-tolerance <- 1 # Initial tolerance was 1e-6
-converged <- FALSE
-iteration <- 0
-max_iteration<-50
-# Initialize previous concentration profiles for convergence checking
-previous_concentration_profiles <- initial_concentration_profiles
+reconstructed_spectra <- final_concentrations %*% t(final_pure_spectra)
 
-# While loop for convergence
-while ((!converged)|(iteration<max_iteration)) {
-  # Run MCR-ALS
-  # https://cran.r-project.org/web/packages/ALS/ALS.pdf
-  mcr_result <- als(
-    CList = list(previous_concentration_profiles),  # Use the previous iteration's concentration profiles
-    PsiList = list(vnir_2d),                        # The actual data matrix
-    S = initial_spectra,                            # Initial spectra estimate
-    nonnegS = TRUE,                                 # Enforce non-negativity for spectra
-    nonnegC = TRUE,                                 # Enforce non-negativity for concentration profiles
-    maxiter = 10,                                   # Maximum number of iterations per ALS call
-    thresh = tolerance                              # Convergence threshold
-  )
-  
-  # Extract resolved spectra and updated concentration profiles
-  current_spectra <- mcr_result$S
-  current_concentration_profiles <- mcr_result$CList[[1]]
-  
-  # Check for convergence by comparing concentration profiles
-  concentration_diff <- sqrt(sum((current_concentration_profiles - previous_concentration_profiles)^2))
-  
-  # Check convergence criteria
-  if (concentration_diff < tolerance) {
-    converged <- TRUE
-  } else {
-    previous_concentration_profiles <- current_concentration_profiles
-    iteration<-iteration+1
-  }
-}
+# Compares observed_spectra, input to the MCR-ALS algorithm [n_samples, n_bands], to reconstructed results
+# Example for plotting the original vs. reconstructed data
+n_samples <- nrow(vnir_2d)
+n_bands <- ncol(vnir_2d)
 
-if (converged) {
-  cat("Converged in", iteration, "iterations.\n")
-} else {
-  cat("Did not converge within the maximum number of iterations.\n")
-}
-final_conc<-mcr_result$C
-final_pure_conc<-mcr_result$S
-
-# Assuming concentrations and final_concentrations are matrices
-# with dimensions [n_samples, n_components]
-
-n_components <- ncol(initial_concentration_profiles)  # Number of components
-n_samples <- nrow(initial_concentration_profiles)     # Number of samples
-
-# Assuming concentrations is the matrix of true concentrations with dimensions [n_samples, n_components]
-
-n_components <- length(initial_concentration_profiles)  # Number of components
-n_samples <- nrow(initial_concentration_profiles)   # Number of samples
-
-# Plot for each component
-par(mfrow = c(n_components, 1))  # Set up a plotting area with multiple plots
-
-for (component_index in 1:n_components) {
-  # Extract the final concentration matrix for this component
-  final_component_conc <- final_conc[[component_index]]
-  
-  # Plot the true concentrations
-  plot(1:n_samples, initial_concentration_profiles[, component_index], type = "l", col = "red",
-       lty = 2, lwd = 2, xlab = "Sample Index", ylab = "Concentration",
-       main = paste("Component", component_index, "Concentration Profile"))
-  
-  # Add the modeled concentrations to the plot
-  lines(1:n_samples, final_component_conc, col = "blue", lty = 1, lwd = 2)
-  
-  # Add a legend
-  legend("topright", legend = c("True Concentration", "Modeled Concentration"),
-         col = c("red", "blue"), lty = c(2, 1), lwd = 2)
-}
-
+# Plot for the first sample
+plot(1:n_bands, vnir_2d[1, ], type = "l", col = "red", 
+     xlab = "Wavelength/Band", ylab = "Intensity",
+     main = "Comparison of Original and Reconstructed Spectra")
+lines(1:n_bands, reconstructed_spectra[1, ], col = "blue")
+legend("topright", legend = c("Original", "Reconstructed"), 
+       col = c("red", "blue"), lty = 1)
