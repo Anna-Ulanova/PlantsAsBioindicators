@@ -4,6 +4,7 @@ if (!requireNamespace("ALS", quietly = TRUE)) {
 }
 library(ALS)
 library(raster)
+start = Sys.time()
 # This script will complete MCR-ALS
 # https://cran.r-project.org/web/packages/ALS/ALS.pdf
 
@@ -47,11 +48,12 @@ mcr_result <- als(
   CList<-list(initial_concentration_profiles), 
   PList<-list(vnir_2d),
   S<-initial_pure_spectra,
+    # Non-negativity constraint on concentrations
+
   nonnegC = TRUE,
-  # Non-negativity constraint on concentrations
   nonnegS = TRUE,
   # Non-negativity constraint on spectra
-  maxiter = 100,
+  maxiter = 200,
   # Maximum number of iterations
   thresh = 1e-6
 )
@@ -68,16 +70,26 @@ final_concentrations <- mcr_result$C[[1]]
 final_pure_spectra <- mcr_result$S
 
 reconstructed_spectra <- final_concentrations %*% t(final_pure_spectra)
-
+# 
 # Compares observed_spectra, input to the MCR-ALS algorithm [n_samples, n_bands], to reconstructed results
 # Example for plotting the original vs. reconstructed data
 n_samples <- nrow(vnir_2d)
 n_bands <- ncol(vnir_2d)
 
 # Plot for the first sample
-plot(1:n_bands, vnir_2d[1, ], type = "l", col = "red", 
+plot(1:n_bands, vnir_2d[1, ], type = "l", col = "red",
      xlab = "Wavelength/Band", ylab = "Intensity",
      main = "Comparison of Original and Reconstructed Spectra")
 lines(1:n_bands, reconstructed_spectra[1, ], col = "blue")
-legend("topright", legend = c("Original", "Reconstructed"), 
+legend("topright", legend = c("Original", "Reconstructed"),
        col = c("red", "blue"), lty = 1)
+
+
+# Complete PCA to find if the number of components has changed
+# Eigenvalue calculation (using concentration profiles as an example)
+eigenvalues <- eigen(cov(final_pure_spectra))$values
+
+# Kaiser’s rule: Select components with eigenvalues > 1
+significant_components <- which(eigenvalues > 1)
+
+print(Sys.time()-start)

@@ -24,66 +24,67 @@
 library(ALS)
 
 # Requires 2D input data used for initial PCA, PCA data, number of components, dimensions of the 
-complete_mcr_als<-function(convert2D, pca_dataset, num_comp, length, width, num_bands){
+complete_mcr_als<-function(vnir_2d, loadings, num_components){
   # 1. Estimate number of spectral components using randomly generated spectra and 
   # additional baseline component (constant offset) by using MCR-ALS. Estimate the
   # required number of components
   
-  # Initial estimate of pure spectra using the PCA components satisfying Kaiser's rule
-  initial_spectra<-pca_dataset$rotation[,1:num_comp]
   
   # Create initial concentration profile estimates
   initial_concentration_profiles <- matrix(
-    runif(nrow(convert2D) * num_comp), 
-    nrow = nrow(convert2D), 
-    ncol = num_comp
+    runif(nrow(vnir_2d) * num_components), 
+    nrow = nrow(vnir_2d), 
+    ncol = num_components)
+  
+  initial_pure_spectra<-loadings
+  
+  
+  mcr_result <- als(
+    CList<-list(initial_concentration_profiles), 
+    PList<-list(vnir_2d),
+    S<-initial_pure_spectra,
+    nonnegC = TRUE,
+    # Non-negativity constraint on concentrations
+    nonnegS = TRUE,
+    # Non-negativity constraint on spectra
+    maxiter = 100,
+    # Maximum number of iterations
+    thresh = 1e-6
   )
-  # 2. Rerun MCR-ALS with adjusted number of spectral components until model
-  # developed appropriate number of spectral components. Convergence is 
   
-  # Define convergence criteria
-  tolerance <- 1e-6
-  converged <- FALSE
-  iteration <- 0
+  # mcr_result$C contains the estimated concentration profiles for each component.
+  # [n_samples, n_components]
+  # Each column in this matrix corresponds to the concentration profile of one
+  # component across all samples. These profiles indicate how the concentration of
+  # each pure component varies across the different samples.
+  # final_concentrations <- mcr_result$C[[1]]
+  # mcr_result$S contains the estimated spectral profiles (or pure spectra) for each component.
+  # [n_bands, n_components]
+  # Purpose: Each column in this matrix corresponds to the spectral profile of one pure component. These profiles represent the characteristic spectra of each pure component across all the spectral bands.
+  final_pure_spectra <- mcr_result$S
   
-  # Initialize previous concentration profiles for convergence checking
-  previous_concentration_profiles <- initial_concentration_profiles
+  # reconstructed_spectra <- final_concentrations %*% t(final_pure_spectra)
+  # 
+  # # Compares observed_spectra, input to the MCR-ALS algorithm [n_samples, n_bands], to reconstructed results
+  # # Example for plotting the original vs. reconstructed data
+  # n_samples <- nrow(vnir_2d)
+  # n_bands <- ncol(vnir_2d)
+  # # Plot for the first sample
+  # plot(1:n_bands, vnir_2d[1, ], type = "l", col = "red", 
+  #      xlab = "Wavelength/Band", ylab = "Intensity",
+  #      main = "Comparison of Original and Reconstructed Spectra")
+  # lines(1:n_bands, reconstructed_spectra[1, ], col = "blue")
+  # legend("topright", legend = c("Original", "Reconstructed"), 
+  #        col = c("red", "blue"), lty = 1)
+  # 
+  # Complete PCA to find if the number of components has changed
+  # Eigenvalue calculation (using concentration profiles as an example)
+  eigenvalues <- eigen(cov(final_pure_spectra))$values
   
-
-  while (!converged) {
-    # Run MCR-ALS
-    mcr_result <- als(
-      CList = list(previous_concentration_profiles),  # Use the previous iteration's concentration profiles
-      PsiList = list(convert2D),                        # The actual data matrix
-      S = initial_concentration_profiles,             # Initial spectra estimate
-      nonnegS = TRUE,                                 # Enforce non-negativity for spectra
-      nonnegC = TRUE,                                 # Enforce non-negativity for concentration profiles
-      maxiter = 10,                                   # Maximum number of iterations per ALS call
-      thresh = tolerance                              # Convergence threshold
-    )
-    # Extract resolved spectra and concentration profiles
-    current_spectra <- mcr_result$S
-    concentration_profiles <- mcr_result$CList[1]
-    
-    # Check for convergence: compute the Frobenius norm of the difference
-    spectral_diff <- sqrt(sum((current_spectra - previous_spectra)^2))
-    
-    # Check convergence criteria
-    if (spectral_diff < tolerance) {
-      converged=TRUE
-    }
-    else {
-      previous_spectra <- current_spectra
-    }
-  }    
-  
-  # Plot resolved pure spectra after convergence
-  matplot(t(current_spectra), type = "l", lty = 1, col = 1:num_components_kaiser, xlab = "Wavelength Index", ylab = "Intensity")
-  legend("topright", legend = paste("Component", 1:num_components_kaiser), col = 1:num_components_kaiser, lty = 1)
-  
-  # Plot concentration profiles for a subset of samples
-  matplot(concentration_profiles[1:100, ], type = "l", lty = 1, col = 1:num_components_kaiser, xlab = "Sample Index", ylab = "Concentration")
-  legend("topright", legend = paste("Component", 1:num_components_kaiser), col = 1:num_components_kaiser, lty = 1)
+  # Kaiser’s rule: Select components with eigenvalues > 1
+  significant_components <- which(eigenvalues > 1)
+  return(significant_components, c)
 }
 
-complete_pca(pca_dataset)
+sig_components<-complete_pca(pca_dataset)[1]
+final_spectra<-complete_pca(pca_dataset)[2]
