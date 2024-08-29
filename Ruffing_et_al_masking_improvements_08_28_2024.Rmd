@@ -1,0 +1,155 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Testing out the method described in Ruffing et al.
+
+## R Markdown
+
+```{r}
+library(raster)
+library(tidyverse)
+creating_conditions<-function(Hyp_As_col3_16_3){
+  #Averaging red between 750 and 850nm
+  Red_avg <- raster::mean(Hyp_As_col3_16_3[[180:204]])
+  
+  #Averaging orange between 550 and 600
+  Orange_avg <- raster::mean(Hyp_As_col3_16_3[[75:92]])
+  
+  #Averaging blue between 410 and 450nm
+  Blue_avg <- raster::mean(Hyp_As_col3_16_3[[10:25]])
+  
+  #Averaging for a blue-green band, in the paper it claimes between 3 and 450nm which makes no sense.
+  #So I'm taking the liberty to make it between 450 and 550
+  Blue_Green_avg <- raster::mean(Hyp_As_col3_16_3[[30:69]])
+  
+  #Orange Average to Blue Average
+  O_B_avg <- Orange_avg/Blue_avg
+  
+  #Red average to Blue-Green Average
+  R_BG_avg <- Red_avg/Blue_Green_avg
+  
+  #Red Cutoff Threshold
+  # Step 1: Calculate the histogram
+  hist_values <- hist(getValues(Red_avg), breaks=256, plot=FALSE)
+  
+  # Step 2: Implement Otsu's method
+  # Compute probability distribution
+  p <- hist_values$counts / sum(hist_values$counts)
+  omega <- cumsum(p)
+  mu <- cumsum(p * hist_values$mids)
+  mu_t <- mu[length(mu)]
+  
+  # Compute between-class variance
+  sigma_b_squared <- (mu_t * omega - mu)^2 / (omega * (1 - omega))
+  
+  # Find the maximum value of between-class variance
+  max_sigma_idx <- which.max(sigma_b_squared)
+  otsu_thresh <- hist_values$mids[max_sigma_idx]
+  
+  # Step 3: Apply the threshold
+  Red_cutoff <- calc(Red_avg, fun = function(x) { ifelse(x > otsu_thresh, 1, 0) })
+  
+  # Plot to visualize
+  plot(Red_cutoff)
+  return(list(red=Red_cutoff, ob=O_B_avg, rbg=R_BG_avg))
+}
+
+
+```
+
+
+CREATING BINARY MASK BASED ON CONDITIONS
+```{r}
+classify_raster_based_on_conditions <- function(red_cutoff_raster, orange_blue_avg_raster, red_bg_avg_raster) {
+  # Define a function to apply to each cell
+  reclassify_function <- function(red_cutoff, orange_blue_avg, red_bg_avg) {
+    # Check the conditions and assign 1 or 0
+    condition1 <- red_cutoff == 1
+    condition2 <- (orange_blue_avg >= 1.75) | (red_bg_avg > 2.5)
+    
+    result <- ifelse(condition1 & condition2, 1, 0)
+    return(result)
+  }
+  
+  # Stack the rasters for easier cell-wise operations
+  raster_stack <- stack(red_cutoff_raster, orange_blue_avg_raster, red_bg_avg_raster)
+  
+  # Apply the reclassification function to each cell
+  reclassified_raster <- calc(raster_stack, fun = function(x) {
+    reclassify_function(x[1], x[2], x[3])
+  })
+  
+  return(reclassified_raster)
+}
+
+```
+
+STACKING ONLY RGB RASTERS
+```{r}
+stacking_selected_bands<-function(raster){
+  #range<-list([10:25],[30:69], [75:92],[180:204])
+  red_stack<-raster[[180:204]]
+  orange_stack<-raster[[75:92]]
+  blue_green_stack<-raster[[30:69]]
+  blue_stack<-raster[[10:25]]
+  subset_raster <- stack(red_stack,orange_stack, blue_stack)
+  return(subset_raster)
+  }
+
+```
+
+APPLYING BINARY MASK ONTO BAND-SUBSETTED RASTER
+
+```{r}
+applying_mask_on_subset<-function(mask, raster){
+  masked<-mask*raster
+  return(masked)
+}
+```
+
+MAIN
+```{r}
+
+control<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/14_1_20230724_2023_07_24_12_33_04/raw_rd_rf')
+treated<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/4_1_20230724_2023_07_24_09_00_14/raw_rd_rf')
+
+control_mask<-creating_conditions(control)
+control_red_cutoff<-control_mask$red
+control_ob_avg<-control_mask$ob
+control_r_bg_avg<-control_mask$rbg
+
+control_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = control_red_cutoff, orange_blue_avg_raster = control_ob_avg, red_bg_avg_raster = control_r_bg_avg)
+
+
+plot(control_reclassified_raster)
+
+
+
+treated_mask<-creating_conditions(treated)
+treated_red_cutoff<-treated_mask$red
+treated_ob_avg<-treated_mask$ob
+treated_r_bg_avg<-treated_mask$rbg
+
+treated_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = treated_red_cutoff, orange_blue_avg_raster = treated_ob_avg, red_bg_avg_raster = treated_r_bg_avg)
+
+
+plot(treated_reclassified_raster)
+
+
+control_subset<-stacking_selected_bands(control)
+
+treated_subset<-stacking_selected_bands(treated)
+
+masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
+masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
+
+
+```
+
