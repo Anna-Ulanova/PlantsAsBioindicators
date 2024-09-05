@@ -1,5 +1,5 @@
 ---
-title: "Big_Daddy_MCR_ALS_troubleshooting"
+title: "masking_pca_mcr_als_confirmation"
 author: "Anna Ulanova"
 date: "2024-08-29"
 output: html_document
@@ -17,7 +17,10 @@ Testing out the method described in Ruffing et al.
 library(raster)
 library(tidyverse)
 library(ALS)
-library(rstatix)
+library(summarytools)
+library(ggplot2)
+library(userfriendlyscience)
+library(car)
 start = Sys.time()
 ```
 
@@ -25,7 +28,8 @@ FINDS AND AVERAGES BANDS OF INTEREST
 FINDS REFLECTANCE RATIOS BASED ON WAVELENGTH CONDITIONS
 COMPLETES OTSU'S METHOD
 ```{r}
-creating_conditions<-function(Hyp_As_col3_16_3){
+
+creating_conditions <- function(Hyp_As_col3_16_3) {
   #Averaging red between 750 and 850nm
   Red_avg <- raster::mean(Hyp_As_col3_16_3[[180:204]])
   
@@ -40,14 +44,14 @@ creating_conditions<-function(Hyp_As_col3_16_3){
   Blue_Green_avg <- raster::mean(Hyp_As_col3_16_3[[30:69]])
   
   #Orange Average to Blue Average
-  O_B_avg <- Orange_avg/Blue_avg
+  O_B_avg <- Orange_avg / Blue_avg
   
   #Red average to Blue-Green Average
-  R_BG_avg <- Red_avg/Blue_Green_avg
+  R_BG_avg <- Red_avg / Blue_Green_avg
   
   #Red Cutoff Threshold
   # Step 1: Calculate the histogram
-  hist_values <- hist(getValues(Red_avg), breaks=256, plot=FALSE)
+  hist_values <- hist(getValues(Red_avg), breaks = 256, plot = FALSE)
   
   # Step 2: Implement Otsu's method
   # Compute probability distribution
@@ -57,18 +61,23 @@ creating_conditions<-function(Hyp_As_col3_16_3){
   mu_t <- mu[length(mu)]
   
   # Compute between-class variance
-  sigma_b_squared <- (mu_t * omega - mu)^2 / (omega * (1 - omega))
+  sigma_b_squared <- (mu_t * omega - mu) ^ 2 / (omega * (1 - omega))
   
   # Find the maximum value of between-class variance
   max_sigma_idx <- which.max(sigma_b_squared)
   otsu_thresh <- hist_values$mids[max_sigma_idx]
   
   # Step 3: Apply the threshold
-  Red_cutoff <- calc(Red_avg, fun = function(x) { ifelse(x > otsu_thresh, 1, 0) })
-  
+  Red_cutoff <-
+    calc(
+      Red_avg,
+      fun = function(x) {
+        ifelse(x > otsu_thresh, 1, 0)
+      }
+    )
   # Plot to visualize
   plot(Red_cutoff)
-  return(list(red=Red_cutoff, ob=O_B_avg, rbg=R_BG_avg))
+  return(list(red = Red_cutoff, ob = O_B_avg, rbg = R_BG_avg))
 }
 
 
@@ -77,49 +86,64 @@ creating_conditions<-function(Hyp_As_col3_16_3){
 
 CREATES BINARY MASK BASED ON CONDITIONS
 ```{r}
-classify_raster_based_on_conditions <- function(red_cutoff_raster, orange_blue_avg_raster, red_bg_avg_raster) {
-  # Define a function to apply to each cell
-  reclassify_function <- function(red_cutoff, orange_blue_avg, red_bg_avg) {
-    # Check the conditions and assign 1 or 0
-    condition1 <- red_cutoff == 1
-    condition2 <- (orange_blue_avg >= 1.75) | (red_bg_avg > 2.5)
+
+classify_raster_based_on_conditions <-
+  function(red_cutoff_raster,
+           orange_blue_avg_raster,
+           red_bg_avg_raster) {
+    # Define a function to apply to each cell
+    reclassify_function <-
+      function(red_cutoff,
+               orange_blue_avg,
+               red_bg_avg) {
+        # Check the conditions and assign 1 or 0
+        condition1 <- red_cutoff == 1
+        condition2 <- (orange_blue_avg >= 1.75) | (red_bg_avg > 2.5)
+        
+        result <- ifelse(condition1 & condition2, 1, 0)
+        return(result)
+      }
     
-    result <- ifelse(condition1 & condition2, 1, 0)
-    return(result)
+    # Stack the rasters for easier cell-wise operations
+    raster_stack <-
+      stack(red_cutoff_raster,
+            orange_blue_avg_raster,
+            red_bg_avg_raster)
+    
+    # Apply the reclassification function to each cell
+    reclassified_raster <- calc(
+      raster_stack,
+      fun = function(x) {
+        reclassify_function(x[1], x[2], x[3])
+      }
+    )
+    
+    return(reclassified_raster)
   }
-  
-  # Stack the rasters for easier cell-wise operations
-  raster_stack <- stack(red_cutoff_raster, orange_blue_avg_raster, red_bg_avg_raster)
-  
-  # Apply the reclassification function to each cell
-  reclassified_raster <- calc(raster_stack, fun = function(x) {
-    reclassify_function(x[1], x[2], x[3])
-  })
-  
-  return(reclassified_raster)
-}
 
 ```
 
 STACKS ONLY RGB RASTERS
 ```{r}
-stacking_selected_bands<-function(raster){
+
+stacking_selected_bands <- function(raster) {
   #range<-list([10:25],[30:69], [75:92],[180:204])
-  red_stack<-raster[[180:204]]
-  orange_stack<-raster[[75:92]]
-  blue_green_stack<-raster[[30:69]]
-  blue_stack<-raster[[10:25]]
-  subset_raster <- stack(red_stack,orange_stack, blue_stack)
+  red_stack <- raster[[180:204]]
+  orange_stack <- raster[[75:92]]
+  blue_green_stack <- raster[[30:69]]
+  blue_stack <- raster[[10:25]]
+  subset_raster <- stack(red_stack, orange_stack, blue_stack)
   return(subset_raster)
-  }
+}
 
 ```
 
 APPLIES BINARY MASK ONTO BAND-SUBSETTED RASTER
 
 ```{r}
-applying_mask_on_subset<-function(mask, raster){
-  masked<-mask*raster
+
+applying_mask_on_subset <- function(mask, raster) {
+  masked <- mask * raster
   return(masked)
 }
 ```
@@ -127,22 +151,35 @@ applying_mask_on_subset<-function(mask, raster){
 
 CONVERTS HYPERCUBE TO 2D MATRIX
 ```{r}
-convert_to_2d<-function(hypercube){
-  matrix2D<-matrix(hypercube, nrow = dim(hypercube)[1] * dim(hypercube)[2], ncol = dim(hypercube)[3])
+
+convert_to_2d <- function(hypercube) {
+  matrix2D <-
+    matrix(
+      hypercube,
+      nrow = dim(hypercube)[1] * dim(hypercube)[2],
+      ncol = dim(hypercube)[3]
+    )
   return(matrix2D)
 }
 ```
 
 COMPLETES PCA, FINDS EIGENVALUES, USES KAISERS RULE TO DETERMINE NUMBER OF COMPONENTS
 ```{r}
-complete_pca<-function(matrix){
-  pca_result <- prcomp(matrix, scale. = TRUE)
 
+complete_pca <- function(matrix) {
+  pca_result <- prcomp(matrix, scale. = TRUE)
+  
   # Extract eigenvalues
-  eigenvalues <- pca_result$sdev^2
+  eigenvalues <- pca_result$sdev ^ 2
   
   # Create a scree plot to visualize eigenvalues and determine the number of components
-  plot(eigenvalues, type = "b", xlab = "Component", ylab = "Eigenvalue", main = "Scree Plot")
+  plot(
+    eigenvalues,
+    type = "b",
+    xlab = "Component",
+    ylab = "Eigenvalue",
+    main = "Scree Plot"
+  )
   abline(h = 1, col = "red", lty = 2)  # Kaiser's rule threshold
   
   # Uses Kaiser-Guttman rule which suggest that "the elbow" in scree plots occurs
@@ -153,6 +190,15 @@ complete_pca<-function(matrix){
 }
 ```
 
+CONVERT ZEROS TO NANS
+1) CONVERTS ALL ZEROS IN 2D MATRIX INTO NANS
+```{R}
+convert_to_zero<- function(matrix2D){
+  nan_matrix<-gsub(0,NA, matrix2D)
+  return(nan_matrix)
+}
+```
+
 CHUNKY MCR TASKS
 1) CREATES INITIAL CONCENTRATION/SPECTRAL GUESSES
 2) COMPLETES MCR-ALS
@@ -160,70 +206,125 @@ CHUNKY MCR TASKS
 4) OUTPUTS NUMBER OF RELEVANT COMPONENTS FROM RECONSTRUCTED DATASET
 
 ```{r}
-complete_mcr_als<-function(matrix2D, component){
+
+complete_mcr_als<-function(matrix2D, component, type){
   # Step 1: Perform MCR-ALS on control_2d
-# Initialize random matrices for MCR-ALS
-  initial_concentration_profiles <- matrix(runif(nrow(matrix2D) * component), 
-                                                   nrow = nrow(matrix2D), 
-                                                   ncol = component)
-  initial_spectra <- matrix(runif(component * ncol(matrix2D)), 
-                                    nrow = ncol(matrix2D), 
-                                    ncol = component)
+  # Initialize random matrices for MCR-ALS
+  initial_concentration_profiles <-
+    matrix(runif(nrow(matrix2D) * component),
+           nrow = nrow(matrix2D),
+           ncol = component)
+  initial_spectra <- matrix(runif(component * ncol(matrix2D)),
+                            nrow = ncol(matrix2D),
+                            ncol = component)
   
   # Run MCR-ALS on control_2d
   mcr_result <- als(
-    CList = list(initial_concentration_profiles), 
-    S = initial_spectra, 
-    PsiList = list(matrix2D), 
-    nonnegC = TRUE, 
-    nonnegS = TRUE, 
-    maxiter = 75, 
+    CList = list(initial_concentration_profiles),
+    S = initial_spectra,
+    PsiList = list(matrix2D),
+    nonnegC = TRUE,
+    nonnegS = TRUE,
+    maxiter = 75,
     thresh = 1e-6
   )
   # Extract the resolved spectral profiles from mcr output
   resolved_spectra <- mcr_result$S
-  resolved_concentration<-mcr_result$C[[1]]
+  resolved_concentration <- mcr_result$C[[1]]
   
-  reconstructed_spectra <- resolved_concentration %*% t(resolved_spectra)
+  reconstructed_spectra <-
+    resolved_concentration %*% t(resolved_spectra)
   #
   # Compares observed_spectra, input to the MCR-ALS algorithm [n_samples, n_bands], to reconstructed results
   # Example for plotting the original vs. reconstructed data
   n_samples <- nrow(matrix2D)
   n_bands <- ncol(matrix2D)
-  
+  title <-
+    paste0(type, ": Comparison of Original and Reconstructed Spectra")
+  save_name <-
+    paste0(
+      'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/',
+      type,
+      '_mcr_als.jpg'
+    )
   # Plot for the first sample
-  plot(1:n_bands, matrix2D[10, ], type = "l", col = "red",
-       xlab = "Wavelength/Band", ylab = "Intensity",
-       main = "Comparison of Original and Reconstructed Spectra")
-  lines(1:n_bands, reconstructed_spectra[10, ], col = "blue")
-  legend("topright", legend = c("Original", "Reconstructed"),
-         col = c("red", "blue"))
-  
+  jpeg(file = save_name)
+  plot(
+    1:n_bands,
+    matrix2D[3,],
+    type = "l",
+    col = "red",
+    xlab = "Wavelength/Band",
+    ylab = "Intensity",
+    main = title
+  )
+  lines(1:n_bands, reconstructed_spectra[3,], col = "blue")
+  legend(
+    "topright",
+    legend = c("Original", "Reconstructed"),
+    col = c("red", "blue")
+  )
+  dev.off()
   #Complete PCA to find if the number of components has changed
   # # Eigenvalue calculation (using concentration profiles as an example)
   eigenvalues <- eigen(cov(reconstructed_spectra))$values
   
   # Kaiser’s rule: Select components with eigenvalues > 1
   significant_components <- which(eigenvalues > 1)
-  return(list(comp=significant_components, spectra=resolved_spectra))
+  return(list(comp = significant_components, spectra = resolved_spectra))
 }
 ```
 
 GAMES-HOWELL
-
 ```{r}
-complete_howells_game<-function(control, treated){
-  data<-rbind(treated, control)
-  # Perform the Howells-Games test
-  test_result <- games_howell_test(data)
-  
-  # Print the test results
-  print(test_result)
 
+complete_howells_game <- function(control, treated) {
+  # Combine the data into a single data frame
+  compiled_data <-
+    data.frame(
+      Group = rep(c("Treated", "Control1", "Control2"), each = 59),
+      Value = c(treated_spectra, control_spectra[, 1], control_spectra[, 2])
+    )
+  
+  # Perform Games-Howell test
+  #https://rdocumentation.org/packages/userfriendlyscience/versions/0.7.2/topics/posthocTGH
+  gh_test <-
+    posthocTGH(y = compiled_data$Value,
+               x = compiled_data$Group,
+               method = "games-howell")
+  return(gh_test)
 }
 ```
 
+```{r Optional chunk- plots only means}
 
+plotGamesHowell <- function(gh_test) {
+  # Extract mean and confidence intervals from the test results
+  means <- tapply(compiled_data$Value, compiled_data$Group, mean)
+  ci <- tapply(compiled_data$Value, compiled_data$Group, function(x) {
+    c(
+      mean(x) - qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x)),
+      mean(x) + qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x))
+    )
+  })
+  
+  # Prepare data for plotting
+  plot_data <- data.frame(
+    Group = names(means),
+    Mean = as.numeric(means),
+    CI_Lower = sapply(ci, `[`, 1),
+    CI_Upper = sapply(ci, `[`, 2)
+  )
+  
+  # Create the plot
+  ggplot(plot_data, aes(x = Group, y = Mean)) +
+    geom_point(size = 3) +
+    geom_errorbar(aes(ymin = CI_Lower, ymax = CI_Upper), width = 0.2) +
+    labs(title = "Mean Spectral Values by Group with 95% Confidence Intervals",
+         x = "Group", y = "Mean Spectral Value") +
+    theme_minimal()
+}
+```
 MAIN
 ```{r}
 
@@ -236,10 +337,6 @@ control_ob_avg<-control_mask$ob
 control_r_bg_avg<-control_mask$rbg
 
 control_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = control_red_cutoff, orange_blue_avg_raster = control_ob_avg, red_bg_avg_raster = control_r_bg_avg)
-
-
-plot(control_reclassified_raster)
-
 
 
 treated_mask<-creating_conditions(treated)
@@ -265,12 +362,15 @@ treated2d<-convert_to_2d(masked_treated_subset)
 
 initial_comp<-complete_pca(control2d)
 
-control_mcr<-complete_mcr_als(control2d, initial_comp)
+control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
 final_comp<-control_mcr$comp
 control_spectra<-control_mcr$spectra
 # control spectra: [1:59, 1:2]
-treated_mcr<-complete_mcr_als(treated2d, final_comp)
+treated_mcr<-complete_mcr_als(treated2d, final_comp, 'Treated')
 treated_spectra<-treated_mcr$spectra
+treated_comp<-treated_mcr$comp
 # treated spectra: [1:59,1]
-complete_howells_game(control_spectra, treated_spectra)
+print(Sys.time()-start) # Takes 33.9 min to complete 
+output<-complete_howells_game(final_comp, treated_comp)
+plotGamesHowell
 ```
