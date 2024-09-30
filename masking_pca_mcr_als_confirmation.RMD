@@ -21,8 +21,105 @@ library(summarytools)
 library(ggplot2)
 library(userfriendlyscience)
 library(car)
+library(dplyr)
 start = Sys.time()
 ```
+1. Isolates all of the directories for VNIR and groups based on treatment, metal, grass
+  - control Se, control As, 5 ppm Se & As, 15 ppm Se & As, 25 ppm Se & As
+  -- Extract all directories that contain the file, raw_rd_rf
+  -- Iterates by directories
+    -- Separates by "/", and looks at the two elements
+    -- Looks up the reference sheet by finding the row that has matching GH ID an tray number
+    -- Isolates grass type, treatment, [ppm]
+  -- Assigns As/Se for first separated element
+  -- 
+  --EX: D:\VNIR\GH_20230724\16_3_20230724_2023_07_24_13_10_38
+  
+```{r Polished and debugged}
+grouping_VNIR_files<-function(directory){
+  spectral_files<-list.files(path=directory, pattern='raw_rd_rf$', recursive=TRUE, full.names= TRUE)
+  reference_dir_txt<- read.csv('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/reference_sheet.txt', sep='\t')
+  group_summary<-list('Dir','Group')
+  # Creates a summary chart with each files directory and group ID
+  for (file in spectral_files){
+    row<-reference_dir_txt[sapply(reference_dir_txt$Partial.directory, function(x) grepl(x, file, fixed = TRUE)), ]
+    print(row)
+    appending<-list(file, row$GroupAssigned)
+    group_summary=rbind(group_summary, appending)
+  }
+  # Groups by group ID
+  dfgroup_summary<-as.data.frame(group_summary[-1,])
+  colnames(dfgroup_summary)<-group_summary[1,]
+  # grouped<-dfgroup_summary %>% group_by(Group) %>%
+  # group_split()
+  return(dfgroup_summary)
+}
+```
+
+
+```{r}
+assigning_control_v_treated(grouped){
+  
+#-----------------------As treatment-----------------------#
+    # SG As run
+   control<- grouped%>%filter(Group=='SG_As_0')
+   
+   treatment5<-grouped%>%filter(Group=='SG_As_5')
+   treatment15<-grouped%>%filter(Group=='SG_As_15')
+   treatment25<-grouped%>%fiter(Group=='SG_As_25')
+   
+    # PRG As run
+   control<- grouped%>%filter(Group=='PRG_As_0')
+   treatment5<-grouped%>%filter(Group=='PRG_As_5')
+   treatment15<-grouped%>%filter(Group=='PRG_As_15')
+   treatment25<-grouped%>%fiter(Group=='PRG_As_25')
+   
+    # Bahia As run
+   control<- grouped%>%filter(Group=='bahia_As_0')
+   treatment5<-grouped%>%filter(Group=='bahia_As_5')
+   treatment15<-grouped%>%filter(Group=='bahia_As_15')
+   treatment25<-grouped%>%fiter(Group=='bahia_As_25')
+   
+   #-----------------------Se treatment-----------------------#
+    # SG Sel run
+   control<- grouped%>%filter(Group=='SG_Sel_0')
+   treatment5<-grouped%>%filter(Group=='SG_Sel_5')
+   treatment15<-grouped%>%filter(Group=='SG_Sel_15')
+   treatment25<-grouped%>%fiter(Group=='SG_Sel_25')
+   
+    # PRG Sel run
+   control<- grouped%>%filter(Group=='PRG_Sel_0')
+   treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
+   treatment15<-grouped%>%filter(Group=='PRG_Sel_15')
+   treatment25<-grouped%>%fiter(Group=='PRG_Sel_25')
+   
+    # Bahia Sel run
+   control<- grouped%>%filter(Group=='bahia_Sel_0')
+   treatment5<-grouped%>%filter(Group=='bahia_Sel_5')
+   treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
+   treatment25<-grouped%>%fiter(Group=='bahia_Sel_25') 
+
+}
+```
+2. For each raster per group: 
+  - Applies mask based on wavelength conditions
+  - Assigns random point and checks if (1) the 100 * 100 square exists on raster
+                                       (2) there are predominantly nonzero values in the outlined square 
+  - Completes spatial subset of the raster and isolates reflectance values for all bands
+  - Isolates the 59 bands used to make the masking conditions and creates a 100*100*59 raster
+  - Repeats the process for each file per group, stacking the subsetted rasters together
+      -- EX: if there are five files per group, the final raster will be 100*100*(59+5)
+      
+      
+      
+      
+3.Uses the compiled rasters for control vs treated groups for the rest of the steps
+  - PCA
+  - MCR-ALS
+  - Games-Howell
+
+
+
 
 FINDS AND AVERAGES BANDS OF INTEREST
 FINDS REFLECTANCE RATIOS BASED ON WAVELENGTH CONDITIONS
@@ -117,7 +214,7 @@ classify_raster_based_on_conditions <-
         reclassify_function(x[1], x[2], x[3])
       }
     )
-    
+    print(dim(reclassified_raster))
     return(reclassified_raster)
   }
 
@@ -354,23 +451,27 @@ control_subset<-stacking_selected_bands(control)
 
 treated_subset<-stacking_selected_bands(treated)
 
-masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
-masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
-
-control2d<-convert_to_2d(masked_control_subset)
-treated2d<-convert_to_2d(masked_treated_subset)
-
-initial_comp<-complete_pca(control2d)
-
-control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
-final_comp<-control_mcr$comp
-control_spectra<-control_mcr$spectra
-# control spectra: [1:59, 1:2]
-treated_mcr<-complete_mcr_als(treated2d, final_comp, 'Treated')
-treated_spectra<-treated_mcr$spectra
-treated_comp<-treated_mcr$comp
-# treated spectra: [1:59,1]
-print(Sys.time()-start) # Takes 33.9 min to complete 
-output<-complete_howells_game(final_comp, treated_comp)
-plotGamesHowell
+# masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
+# masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
+# 
+# control2d<-convert_to_2d(masked_control_subset)
+# treated2d<-convert_to_2d(masked_treated_subset)
+# 
+# initial_comp<-complete_pca(control2d)
+# 
+# na_control<-convert_to_zero(control2d)
+# 
+# na_treated<- convert_to_zero(treated2d)
+# 
+# control_mcr<-complete_mcr_als(na_control, initial_comp,'Control')
+# final_comp<-control_mcr$comp
+# control_spectra<-control_mcr$spectra
+# # control spectra: [1:59, 1:2]
+# treated_mcr<-complete_mcr_als(na_treated, final_comp, 'Treated')
+# treated_spectra<-treated_mcr$spectra
+# treated_comp<-treated_mcr$comp
+# # treated spectra: [1:59,1]
+# print(Sys.time()-start) # Takes 33.9 min to complete 
+# output<-complete_howells_game(final_comp, treated_comp)
+# plotGamesHowell
 ```
