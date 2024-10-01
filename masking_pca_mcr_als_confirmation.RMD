@@ -36,8 +36,8 @@ start = Sys.time()
   --EX: D:\VNIR\GH_20230724\16_3_20230724_2023_07_24_13_10_38
   
 ```{r Polished and debugged}
-grouping_VNIR_files<-function(directory){
-  spectral_files<-list.files(path=directory, pattern='raw_rd_rf$', recursive=TRUE, full.names= TRUE)
+grouping_VNIR_files<-function(){
+  spectral_files<-list.files(path='D:/VNIR', pattern='raw_rd_rf$', recursive=TRUE, full.names= TRUE)
   reference_dir_txt<- read.csv('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/reference_sheet.txt', sep='\t')
   group_summary<-list('Dir','Group')
   # Creates a summary chart with each files directory and group ID
@@ -52,22 +52,26 @@ grouping_VNIR_files<-function(directory){
   colnames(dfgroup_summary)<-group_summary[1,]
   # grouped<-dfgroup_summary %>% group_by(Group) %>%
   # group_split()
-  return(dfgroup_summary)
+  assigning_control_v_treated(dfgroup_summary)
 }
 ```
 
 
-```{r}
-assigning_control_v_treated(grouped){
+```{r Polished and debugged}
+assigning_control_v_treated<-function(grouped){
   
 #-----------------------As treatment-----------------------#
     # SG As run
    control<- grouped%>%filter(Group=='SG_As_0')
-   
+   control_2D<-launch_rasters(control)
    treatment5<-grouped%>%filter(Group=='SG_As_5')
+   treatment5_2D<-launch_rasters(treatment5)
+
    treatment15<-grouped%>%filter(Group=='SG_As_15')
-   treatment25<-grouped%>%fiter(Group=='SG_As_25')
+   treatment15_2D<-launch_rasters(treatment15)
    
+   treatment25<-grouped%>%fiter(Group=='SG_As_25')
+   treatment25_2D<-launch_rasters(treatment25)
     # PRG As run
    control<- grouped%>%filter(Group=='PRG_As_0')
    treatment5<-grouped%>%filter(Group=='PRG_As_5')
@@ -76,6 +80,8 @@ assigning_control_v_treated(grouped){
    
     # Bahia As run
    control<- grouped%>%filter(Group=='bahia_As_0')
+   control_2D<-launch_rasters(control)
+   
    treatment5<-grouped%>%filter(Group=='bahia_As_5')
    treatment15<-grouped%>%filter(Group=='bahia_As_15')
    treatment25<-grouped%>%fiter(Group=='bahia_As_25')
@@ -83,10 +89,16 @@ assigning_control_v_treated(grouped){
    #-----------------------Se treatment-----------------------#
     # SG Sel run
    control<- grouped%>%filter(Group=='SG_Sel_0')
+   control_2D<-launch_rasters(control)
    treatment5<-grouped%>%filter(Group=='SG_Sel_5')
-   treatment15<-grouped%>%filter(Group=='SG_Sel_15')
-   treatment25<-grouped%>%fiter(Group=='SG_Sel_25')
+   treatment5_2D<-launch_rasters(treatment5)
    
+   treatment15<-grouped%>%filter(Group=='SG_Sel_15')
+   treatment15_2D<-launch_rasters(treatment15)
+
+   treatment25<-grouped%>%fiter(Group=='SG_Sel_25')
+   treatment25_2D<-launch_rasters(treatment25)
+
     # PRG Sel run
    control<- grouped%>%filter(Group=='PRG_Sel_0')
    treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
@@ -99,6 +111,80 @@ assigning_control_v_treated(grouped){
    treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
    treatment25<-grouped%>%fiter(Group=='bahia_Sel_25') 
 
+}
+```
+```{r}
+launching_analysis<-function(group1, group2){
+  control<-open_combine_rasters(group1)
+  treated<-open_combine_rasters(group2)
+  intial_comp<-complete_pca(control)
+  control_mcr<-complete_mcr_als(control2d, initial_comp, '')
+  final_comp<-control_mcr$spectra
+  treated_mcr<-complete_mcr_als(treated, final_comp, '')
+  treated_spectra<-treated_mcr
+}
+```
+
+Iterates by each raster directory, applying mask and filter, converting to 2D, appending to overall group 
+```{r}
+open_combine_rasters<-function(summary_per_group){
+  group_dirs<-summary_per_group$Dir
+  # Creates empty matrix that will follow the converted 2D matrix form of (col*row, nbands)
+  # Since the sampled matrix will be 100*100*59, we will create 1,10000
+  raster_group_summary<-matrix(nrow=1, ncol=100*100)
+  for (dir in group_dirs){
+    raster<-stack(dir)
+    mask<-creating_conditions(raster)
+    mask_red<-mask$red
+    mask_ob_avg<-mask$ob
+    mask_r_bg_avg<-mask$rbg
+    
+    reclassified_raster<-classifying_raster_based_on_conditions(mask_red, mask_ob_avg, mask_r_bg_avg)
+    subset<-stacking_selected_bands(raster)
+    masked_subset<-applying_mask_on_subset(raster, reclassified_raster)
+    cropped_raster<-applying_spatial_subset(masked_subset)
+    cropped_2D<-convert_to_2d(cropped_raster)
+    raster_group_summary<-rbind(raster_group_summary, cropped_2D)
+  }
+  return(raster_group_summary)
+}
+```
+
+Finds the 100*100 spatial subset of the raster by checking if the values are predominantly nonzero
+```{r}
+applying_spatial_subset<-function(raster){
+  first_layer<-raster[[1]]
+  rows<-dim(raster)[1]
+  columns<-dim(raster)[2]
+  predominantly_zero=TRUE
+  subset_raster<-matrix(0, nrow=100, ncol=100)
+  while (predominantly_nonzero){
+    random_r<-sample(100:(rows-100),1)
+    random_c<-sample(100:(columns-100),1)
+    row_min <-random_r-50
+    row_max <-random_r+50
+    col_min <-random_c-50
+    col_max <-random_c+50
+    # Extract the 100x100 square
+    subset_raster <- crop(first_layer, extent(first_layer, col_min, col_max, row_min, row_max))
+    
+    # Convert the square to a matrix for easier analysis
+    square_values <- as.matrix(subset_raster)
+    
+    # Count non-zero values
+    non_zero_count <- sum(square_values != 0)
+    total_count <- length(square_values)
+    
+    # Calculate the percentage of non-zero values
+    non_zero_percentage <- (non_zero_count / total_count) * 100
+    # Check if it's 60% or more
+    if (non_zero_percentage >= 60){
+      predominantly_zero=FALSE
+      raster<-crop(raster, extent(raster, col_min, col_max, row_min, row_max))
+      return(raster)
+    }
+  }
+  
 }
 ```
 2. For each raster per group: 
@@ -268,15 +354,15 @@ complete_pca <- function(matrix) {
   
   # Extract eigenvalues
   eigenvalues <- pca_result$sdev ^ 2
-  
+  # Remove comment if you want to see the Screen Plot
   # Create a scree plot to visualize eigenvalues and determine the number of components
-  plot(
-    eigenvalues,
-    type = "b",
-    xlab = "Component",
-    ylab = "Eigenvalue",
-    main = "Scree Plot"
-  )
+  # plot(
+  #   eigenvalues,
+  #   type = "b",
+  #   xlab = "Component",
+  #   ylab = "Eigenvalue",
+  #   main = "Scree Plot"
+  # )
   abline(h = 1, col = "red", lty = 2)  # Kaiser's rule threshold
   
   # Uses Kaiser-Guttman rule which suggest that "the elbow" in scree plots occurs
@@ -287,14 +373,14 @@ complete_pca <- function(matrix) {
 }
 ```
 
-CONVERT ZEROS TO NANS
-1) CONVERTS ALL ZEROS IN 2D MATRIX INTO NANS
-```{R}
-convert_to_zero<- function(matrix2D){
-  nan_matrix<-gsub(0,NA, matrix2D)
-  return(nan_matrix)
-}
-```
+<!-- CONVERT ZEROS TO NANS -->
+<!-- 1) CONVERTS ALL ZEROS IN 2D MATRIX INTO NANS -->
+<!-- ```{R} -->
+<!-- convert_to_zero<- function(matrix2D){ -->
+<!--   nan_matrix<-gsub(0,NA, matrix2D) -->
+<!--   return(nan_matrix) -->
+<!-- } -->
+<!-- ``` -->
 
 CHUNKY MCR TASKS
 1) CREATES INITIAL CONCENTRATION/SPECTRAL GUESSES
@@ -336,32 +422,33 @@ complete_mcr_als<-function(matrix2D, component, type){
   # Example for plotting the original vs. reconstructed data
   n_samples <- nrow(matrix2D)
   n_bands <- ncol(matrix2D)
-  title <-
-    paste0(type, ": Comparison of Original and Reconstructed Spectra")
-  save_name <-
-    paste0(
-      'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/',
-      type,
-      '_mcr_als.jpg'
-    )
-  # Plot for the first sample
-  jpeg(file = save_name)
-  plot(
-    1:n_bands,
-    matrix2D[3,],
-    type = "l",
-    col = "red",
-    xlab = "Wavelength/Band",
-    ylab = "Intensity",
-    main = title
-  )
-  lines(1:n_bands, reconstructed_spectra[3,], col = "blue")
-  legend(
-    "topright",
-    legend = c("Original", "Reconstructed"),
-    col = c("red", "blue")
-  )
-  dev.off()
+  # Remove comment if you want to plot the MCR output
+  # title <-
+  #   paste0(type, ": Comparison of Original and Reconstructed Spectra")
+  # save_name <-
+  #   paste0(
+  #     'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/',
+  #     type,
+  #     '_mcr_als.jpg'
+  #   )
+  # # Plot for the first sample
+  # jpeg(file = save_name)
+  # plot(
+  #   1:n_bands,
+  #   matrix2D[3,],
+  #   type = "l",
+  #   col = "red",
+  #   xlab = "Wavelength/Band",
+  #   ylab = "Intensity",
+  #   main = title
+  # )
+  # lines(1:n_bands, reconstructed_spectra[3,], col = "blue")
+  # legend(
+  #   "topright",
+  #   legend = c("Original", "Reconstructed"),
+  #   col = c("red", "blue")
+  # )
+  # dev.off()
   #Complete PCA to find if the number of components has changed
   # # Eigenvalue calculation (using concentration profiles as an example)
   eigenvalues <- eigen(cov(reconstructed_spectra))$values
@@ -451,27 +538,27 @@ control_subset<-stacking_selected_bands(control)
 
 treated_subset<-stacking_selected_bands(treated)
 
-# masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
-# masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
-# 
-# control2d<-convert_to_2d(masked_control_subset)
-# treated2d<-convert_to_2d(masked_treated_subset)
-# 
-# initial_comp<-complete_pca(control2d)
-# 
-# na_control<-convert_to_zero(control2d)
-# 
-# na_treated<- convert_to_zero(treated2d)
-# 
-# control_mcr<-complete_mcr_als(na_control, initial_comp,'Control')
-# final_comp<-control_mcr$comp
-# control_spectra<-control_mcr$spectra
-# # control spectra: [1:59, 1:2]
-# treated_mcr<-complete_mcr_als(na_treated, final_comp, 'Treated')
-# treated_spectra<-treated_mcr$spectra
-# treated_comp<-treated_mcr$comp
-# # treated spectra: [1:59,1]
-# print(Sys.time()-start) # Takes 33.9 min to complete 
-# output<-complete_howells_game(final_comp, treated_comp)
+masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
+masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
+
+control2d<-convert_to_2d(masked_control_subset)
+treated2d<-convert_to_2d(masked_treated_subset)
+
+initial_comp<-complete_pca(control2d)
+
+na_control<-convert_to_zero(control2d)
+
+na_treated<- convert_to_zero(treated2d)
+
+control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
+final_comp<-control_mcr$comp
+control_spectra<-control_mcr$spectra
+# control spectra: [1:59, 1:2]
+treated_mcr<-complete_mcr_als(treated2d, final_comp, 'Treated')
+treated_spectra<-treated_mcr$spectra
+treated_comp<-treated_mcr$comp
+# treated spectra: [1:59,1]
+print(Sys.time()-start) # Takes 33.9 min to complete
+output<-complete_howells_game(final_comp, treated_comp)
 # plotGamesHowell
 ```
