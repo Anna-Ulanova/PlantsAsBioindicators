@@ -53,6 +53,7 @@ grouping_VNIR_files<-function(){
   # grouped<-dfgroup_summary %>% group_by(Group) %>%
   # group_split()
   assigning_control_v_treated(dfgroup_summary)
+  print('assigning_control_v_treated-- complete')
 }
 ```
 
@@ -63,75 +64,96 @@ assigning_control_v_treated<-function(grouped){
   #-----------------------As treatment-----------------------#
   # SG As run
   control<- grouped%>%filter(Group=='SG_As_0')
-  control_2D<-launch_rasters(control)
-  
   treatment5<-grouped%>%filter(Group=='SG_As_5')
-  treatment5_2D<-launch_rasters(treatment5)
   type<-"SG_As_control_v_5ppm"
+  if (dim(control)>0)
+  launching_analysis(control, treatment5, type)
   
   treatment15<-grouped%>%filter(Group=='SG_As_15')
-  treatment15_2D<-launch_rasters(treatment15)
   type<-"SG_As_control_v_15ppm"
-  
+  launching_analysis(control, treatment5, type)
+
   treatment25<-grouped%>%fiter(Group=='SG_As_25')
-  treatment25_2D<-launch_rasters(treatment25)
   type<-"SG_As_control_v_25ppm"
-  
+  launching_analysis(control, treatment5, type)
+
   # PRG As run
   control<- grouped%>%filter(Group=='PRG_As_0')
+  
   treatment5<-grouped%>%filter(Group=='PRG_As_5')
   type<-"PGR_As_control_v_5ppm"
-  
+  launching_analysis(control, treatment5, type)
+
   treatment15<-grouped%>%filter(Group=='PRG_As_15')
   type<-"PGR_As_control_vs_15ppm"
+  launching_analysis(control, treatment5, type)
+
   
   treatment25<-grouped%>%fiter(Group=='PRG_As_25')
   type<-"PGR_As_control_v_25ppm"
+  launching_analysis(control, treatment5, type)
+
   # Bahia As run
   control<- grouped%>%filter(Group=='bahia_As_0')
-  control_2D<-launch_rasters(control)
-  
+
   treatment5<-grouped%>%filter(Group=='bahia_As_5')
   type<-"bahia_As_control_v_5ppm"
-  
+  launching_analysis(control, treatment5, type)
+
   treatment15<-grouped%>%filter(Group=='bahia_As_15')
   type<-"bahia_As_control_v_15ppm"
-  
+  launching_analysis(control, treatment5, type)
+
   treatment25<-grouped%>%fiter(Group=='bahia_As_25')
   type<-"bahia_As_control_v_25ppm"
+  launching_analysis(control, treatment5, type)
+
   #-----------------------Se treatment-----------------------#
   # SG Sel run
   control<- grouped%>%filter(Group=='SG_Sel_0')
-  control_2D<-launch_rasters(control)
+  
   treatment5<-grouped%>%filter(Group=='SG_Sel_5')
   type<-"SG_Sel_control_v_5ppm"
-  
-  treatment5_2D<-launch_rasters(treatment5)
-  type<-"SG_Sel_control_5ppm"
-  
+  launching_analysis(control, treatment5, type)
+
+
   treatment15<-grouped%>%filter(Group=='SG_Sel_15')
-  treatment15_2D<-launch_rasters(treatment15)
   type<-"SG_Sel_control_v_15pp"
-  
+  launching_analysis(control, treatment5, type)
+
   treatment25<-grouped%>%fiter(Group=='SG_Sel_25')
-  treatment25_2D<-launch_rasters(treatment25)
   type<-"SG_Sel_control_v_25ppm"
+  launching_analysis(control, treatment5, type)
+
   # PRG Sel run
   control<- grouped%>%filter(Group=='PRG_Sel_0')
+  
   treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
   type<-"PRG_Sel_control_v_5ppm"
+  launching_analysis(control, treatment5, type)
+
   treatment15<-grouped%>%filter(Group=='PRG_Sel_15')
   type<-"PRG_Sel_control_v_15ppm"
+  launching_analysis(control, treatment5, type)
+
   treatment25<-grouped%>%fiter(Group=='PRG_Sel_25')
   type<-"PRG_Sel_control_v_25ppm"
+  launching_analysis(control, treatment5, type)
+
   # Bahia Sel run
   control<- grouped%>%filter(Group=='bahia_Sel_0')
+  
   treatment5<-grouped%>%filter(Group=='bahia_Sel_5')
   type<-"bahia_Sel_control_v_5ppm"
+  launching_analysis(control, treatment5, type)
+
   treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
   type<-"bahia_Sel_control_v_15ppm"
+  launching_analysis(control, treatment5, type)
+
   treatment25<-grouped%>%fiter(Group=='bahia_Sel_25') 
   type<-"bahia_Sel_control_v_ppm"
+  launching_analysis(control, treatment5, type)
 }
 ```
 
