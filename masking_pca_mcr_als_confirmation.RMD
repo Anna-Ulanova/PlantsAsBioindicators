@@ -25,19 +25,19 @@ library(dplyr)
 start = Sys.time()
 ```
 1. Isolates all of the directories for VNIR and groups based on treatment, metal, grass
-  - control Se, control As, 5 ppm Se & As, 15 ppm Se & As, 25 ppm Se & As
-  -- Extract all directories that contain the file, raw_rd_rf
-  -- Iterates by directories
-    -- Separates by "/", and looks at the two elements
-    -- Looks up the reference sheet by finding the row that has matching GH ID an tray number
-    -- Isolates grass type, treatment, [ppm]
-  -- Assigns As/Se for first separated element
-  -- 
-  --EX: D:\VNIR\GH_20230724\16_3_20230724_2023_07_24_13_10_38
-  
+- control Se, control As, 5 ppm Se & As, 15 ppm Se & As, 25 ppm Se & As
+-- Extract all directories that contain the file, raw_rd_rf
+-- Iterates by directories
+-- Separates by "/", and looks at the two elements
+-- Looks up the reference sheet by finding the row that has matching GH ID an tray number
+-- Isolates grass type, treatment, [ppm]
+-- Assigns As/Se for first separated element
+-- 
+--EX: D:\VNIR\GH_20230724\16_3_20230724_2023_07_24_13_10_38
+
 ```{r Polished and debugged}
 grouping_VNIR_files<-function(){
-  spectral_files<-list.files(path='D:/VNIR', pattern='raw_rd_rf$', recursive=TRUE, full.names= TRUE)
+  spectral_files<-list.files(path='D:/VNIR/GH_20231213', pattern='raw_rd_rf$', recursive=TRUE, full.names= TRUE)
   reference_dir_txt<- read.csv('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/reference_sheet.txt', sep='\t')
   group_summary<-list('Dir','Group')
   # Creates a summary chart with each files directory and group ID
@@ -60,68 +60,92 @@ grouping_VNIR_files<-function(){
 ```{r Polished and debugged}
 assigning_control_v_treated<-function(grouped){
   
-#-----------------------As treatment-----------------------#
-    # SG As run
-   control<- grouped%>%filter(Group=='SG_As_0')
-   control_2D<-launch_rasters(control)
-   treatment5<-grouped%>%filter(Group=='SG_As_5')
-   treatment5_2D<-launch_rasters(treatment5)
-
-   treatment15<-grouped%>%filter(Group=='SG_As_15')
-   treatment15_2D<-launch_rasters(treatment15)
-   
-   treatment25<-grouped%>%fiter(Group=='SG_As_25')
-   treatment25_2D<-launch_rasters(treatment25)
-    # PRG As run
-   control<- grouped%>%filter(Group=='PRG_As_0')
-   treatment5<-grouped%>%filter(Group=='PRG_As_5')
-   treatment15<-grouped%>%filter(Group=='PRG_As_15')
-   treatment25<-grouped%>%fiter(Group=='PRG_As_25')
-   
-    # Bahia As run
-   control<- grouped%>%filter(Group=='bahia_As_0')
-   control_2D<-launch_rasters(control)
-   
-   treatment5<-grouped%>%filter(Group=='bahia_As_5')
-   treatment15<-grouped%>%filter(Group=='bahia_As_15')
-   treatment25<-grouped%>%fiter(Group=='bahia_As_25')
-   
-   #-----------------------Se treatment-----------------------#
-    # SG Sel run
-   control<- grouped%>%filter(Group=='SG_Sel_0')
-   control_2D<-launch_rasters(control)
-   treatment5<-grouped%>%filter(Group=='SG_Sel_5')
-   treatment5_2D<-launch_rasters(treatment5)
-   
-   treatment15<-grouped%>%filter(Group=='SG_Sel_15')
-   treatment15_2D<-launch_rasters(treatment15)
-
-   treatment25<-grouped%>%fiter(Group=='SG_Sel_25')
-   treatment25_2D<-launch_rasters(treatment25)
-
-    # PRG Sel run
-   control<- grouped%>%filter(Group=='PRG_Sel_0')
-   treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
-   treatment15<-grouped%>%filter(Group=='PRG_Sel_15')
-   treatment25<-grouped%>%fiter(Group=='PRG_Sel_25')
-   
-    # Bahia Sel run
-   control<- grouped%>%filter(Group=='bahia_Sel_0')
-   treatment5<-grouped%>%filter(Group=='bahia_Sel_5')
-   treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
-   treatment25<-grouped%>%fiter(Group=='bahia_Sel_25') 
-
+  #-----------------------As treatment-----------------------#
+  # SG As run
+  control<- grouped%>%filter(Group=='SG_As_0')
+  control_2D<-launch_rasters(control)
+  
+  treatment5<-grouped%>%filter(Group=='SG_As_5')
+  treatment5_2D<-launch_rasters(treatment5)
+  type<-"SG_As_control_v_5ppm"
+  
+  treatment15<-grouped%>%filter(Group=='SG_As_15')
+  treatment15_2D<-launch_rasters(treatment15)
+  type<-"SG_As_control_v_15ppm"
+  
+  treatment25<-grouped%>%fiter(Group=='SG_As_25')
+  treatment25_2D<-launch_rasters(treatment25)
+  type<-"SG_As_control_v_25ppm"
+  
+  # PRG As run
+  control<- grouped%>%filter(Group=='PRG_As_0')
+  treatment5<-grouped%>%filter(Group=='PRG_As_5')
+  type<-"PGR_As_control_v_5ppm"
+  
+  treatment15<-grouped%>%filter(Group=='PRG_As_15')
+  type<-"PGR_As_control_vs_15ppm"
+  
+  treatment25<-grouped%>%fiter(Group=='PRG_As_25')
+  type<-"PGR_As_control_v_25ppm"
+  # Bahia As run
+  control<- grouped%>%filter(Group=='bahia_As_0')
+  control_2D<-launch_rasters(control)
+  
+  treatment5<-grouped%>%filter(Group=='bahia_As_5')
+  type<-"bahia_As_control_v_5ppm"
+  
+  treatment15<-grouped%>%filter(Group=='bahia_As_15')
+  type<-"bahia_As_control_v_15ppm"
+  
+  treatment25<-grouped%>%fiter(Group=='bahia_As_25')
+  type<-"bahia_As_control_v_25ppm"
+  #-----------------------Se treatment-----------------------#
+  # SG Sel run
+  control<- grouped%>%filter(Group=='SG_Sel_0')
+  control_2D<-launch_rasters(control)
+  treatment5<-grouped%>%filter(Group=='SG_Sel_5')
+  type<-"SG_Sel_control_v_5ppm"
+  
+  treatment5_2D<-launch_rasters(treatment5)
+  type<-"SG_Sel_control_5ppm"
+  
+  treatment15<-grouped%>%filter(Group=='SG_Sel_15')
+  treatment15_2D<-launch_rasters(treatment15)
+  type<-"SG_Sel_control_v_15pp"
+  
+  treatment25<-grouped%>%fiter(Group=='SG_Sel_25')
+  treatment25_2D<-launch_rasters(treatment25)
+  type<-"SG_Sel_control_v_25ppm"
+  # PRG Sel run
+  control<- grouped%>%filter(Group=='PRG_Sel_0')
+  treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
+  type<-"PRG_Sel_control_v_5ppm"
+  treatment15<-grouped%>%filter(Group=='PRG_Sel_15')
+  type<-"PRG_Sel_control_v_15ppm"
+  treatment25<-grouped%>%fiter(Group=='PRG_Sel_25')
+  type<-"PRG_Sel_control_v_25ppm"
+  # Bahia Sel run
+  control<- grouped%>%filter(Group=='bahia_Sel_0')
+  treatment5<-grouped%>%filter(Group=='bahia_Sel_5')
+  type<-"bahia_Sel_control_v_5ppm"
+  treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
+  type<-"bahia_Sel_control_v_15ppm"
+  treatment25<-grouped%>%fiter(Group=='bahia_Sel_25') 
+  type<-"bahia_Sel_control_v_ppm"
 }
 ```
+
 ```{r}
-launching_analysis<-function(group1, group2){
+launching_analysis<-function(group1, group2, type){
   control<-open_combine_rasters(group1)
   treated<-open_combine_rasters(group2)
   intial_comp<-complete_pca(control)
   control_mcr<-complete_mcr_als(control2d, initial_comp, '')
   final_comp<-control_mcr$spectra
   treated_mcr<-complete_mcr_als(treated, final_comp, '')
-  treated_spectra<-treated_mcr
+  treated_spectra<-treated_mcr$spectra
+  treated_comp<-treated_mcr$comp
+  output<-complete_howells_game(final_comp, treated_comp, type)
 }
 ```
 
@@ -188,21 +212,21 @@ applying_spatial_subset<-function(raster){
 }
 ```
 2. For each raster per group: 
-  - Applies mask based on wavelength conditions
-  - Assigns random point and checks if (1) the 100 * 100 square exists on raster
-                                       (2) there are predominantly nonzero values in the outlined square 
-  - Completes spatial subset of the raster and isolates reflectance values for all bands
-  - Isolates the 59 bands used to make the masking conditions and creates a 100*100*59 raster
-  - Repeats the process for each file per group, stacking the subsetted rasters together
-      -- EX: if there are five files per group, the final raster will be 100*100*(59+5)
-      
-      
-      
-      
+- Applies mask based on wavelength conditions
+- Assigns random point and checks if (1) the 100 * 100 square exists on raster
+(2) there are predominantly nonzero values in the outlined square 
+- Completes spatial subset of the raster and isolates reflectance values for all bands
+- Isolates the 59 bands used to make the masking conditions and creates a 100*100*59 raster
+- Repeats the process for each file per group, stacking the subsetted rasters together
+-- EX: if there are five files per group, the final raster will be 100*100*(59+5)
+
+
+
+
 3.Uses the compiled rasters for control vs treated groups for the rest of the steps
-  - PCA
-  - MCR-ALS
-  - Games-Howell
+- PCA
+- MCR-ALS
+- Games-Howell
 
 
 
@@ -461,31 +485,26 @@ complete_mcr_als<-function(matrix2D, component, type){
 
 GAMES-HOWELL
 ```{r}
-
-complete_howells_game <- function(control, treated) {
-  # Combine the data into a single data frame
-  compiled_data <-
-    data.frame(
-      Group = rep(c("Treated", "Control1", "Control2"), each = 59),
-      Value = c(treated_spectra, control_spectra[, 1], control_spectra[, 2])
-    )
+complete_howells_game<-function(control, treated, name){
+  final_spectra_avg <- rowMeans(control)  # This takes the average of the two columns in final_spectra
   
-  # Perform Games-Howell test
-  #https://rdocumentation.org/packages/userfriendlyscience/versions/0.7.2/topics/posthocTGH
-  gh_test <-
-    posthocTGH(y = compiled_data$Value,
-               x = compiled_data$Group,
-               method = "games-howell")
-  return(gh_test)
-}
-```
-
-```{r Optional chunk- plots only means}
-
-plotGamesHowell <- function(gh_test) {
-  # Extract mean and confidence intervals from the test results
-  means <- tapply(compiled_data$Value, compiled_data$Group, mean)
-  ci <- tapply(compiled_data$Value, compiled_data$Group, function(x) {
+  # Ensure that both final_spectra_avg and treated_spectra are vectors of the same length
+  # Combine them into a single dataframe with a group label
+  
+  control_spectra <- data.frame(Spectra = final_spectra_avg, Group = "Control")
+  treated_spectra_df <- data.frame(Spectra = treated, Group = "Treated")
+  
+  # Combine the two datasets into one dataframe
+  compiled_spectra <- rbind(control_spectra, treated_spectra_df)
+  
+  # Perform the Games-Howell test
+  gh_results <- posthocTGH(y = compiled_spectra$Spectra, 
+                         x = compiled_spectra$Group, 
+                         method = "games-howell")
+  
+  # Extract mean and confidence intervals for plotting
+  means <- tapply(compiled_spectra$Spectra, compiled_spectra$Group, mean)
+  ci <- tapply(compiled_spectra$Spectra, compiled_spectra$Group, function(x) {
     c(
       mean(x) - qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x)),
       mean(x) + qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x))
@@ -507,7 +526,69 @@ plotGamesHowell <- function(gh_test) {
     labs(title = "Mean Spectral Values by Group with 95% Confidence Intervals",
          x = "Group", y = "Mean Spectral Value") +
     theme_minimal()
+  
+  
+  # 4. Prepare a summary dataframe
+  summary_df <- data.frame(
+    Group1 = rownames(gh_summary),
+    Control = group_means[1,2],
+    Treated = group_means[2,2],
+    Diff = gh_summary$diff,
+    CI_Lower = gh_summary$ci.lo,
+    CI_Upper = gh_summary$ci.hi,
+    P_Value = gh_summary$p
+  )
+  
+  # 5. Save the summary to a CSV file
+  write.csv(summary_df, paste('D:/Reflectance summary/', name, '_summary.txt'), row.names = FALSE)
+  
 }
+# complete_howells_game <- function(control, treated) {
+#   # Combine the data into a single data frame
+#   compiled_data <-
+#     data.frame(
+#       Group = rep(c("Treated", "Control1", "Control2"), each = 59),
+#       Value = c(treated_spectra, control_spectra[, 1], control_spectra[, 2])
+#     )
+#   
+#   # Perform Games-Howell test
+#   #https://rdocumentation.org/packages/userfriendlyscience/versions/0.7.2/topics/posthocTGH
+#   gh_test <-
+#     posthocTGH(y = compiled_data$Value,
+#                x = compiled_data$Group,
+#                method = "games-howell")
+#   return(list(test=gh_test, compiled_data=compiled_data))
+# }
+# ```
+# 
+# ```{r Optional chunk- plots only means}
+# 
+# plotGamesHowell <- function(compiled_data) {
+#   # Extract mean and confidence intervals from the test results
+#   means <- tapply(compiled_data$Value, compiled_data$Group, mean)
+#   ci <- tapply(compiled_data$Value, compiled_data$Group, function(x) {
+#     c(
+#       mean(x) - qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x)),
+#       mean(x) + qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x))
+#     )
+#   })
+#   
+#   # Prepare data for plotting
+#   plot_data <- data.frame(
+#     Group = names(means),
+#     Mean = as.numeric(means),
+#     CI_Lower = sapply(ci, `[`, 1),
+#     CI_Upper = sapply(ci, `[`, 2)
+#   )
+#   
+#   # Create the plot
+#   ggplot(plot_data, aes(x = Group, y = Mean)) +
+#     geom_point(size = 3) +
+#     geom_errorbar(aes(ymin = CI_Lower, ymax = CI_Upper), width = 0.2) +
+#     labs(title = "Mean Spectral Values by Group with 95% Confidence Intervals",
+#          x = "Group", y = "Mean Spectral Value") +
+#     theme_minimal()
+# }
 ```
 MAIN
 ```{r}
@@ -545,20 +626,20 @@ control2d<-convert_to_2d(masked_control_subset)
 treated2d<-convert_to_2d(masked_treated_subset)
 
 initial_comp<-complete_pca(control2d)
-
-na_control<-convert_to_zero(control2d)
-
-na_treated<- convert_to_zero(treated2d)
+# 
+# na_control<-convert_to_zero(control2d)
+# 
+# na_treated<- convert_to_zero(treated2d)
 
 control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
-final_comp<-control_mcr$comp
+final_spectra<-control_mcr$spectra
 control_spectra<-control_mcr$spectra
 # control spectra: [1:59, 1:2]
 treated_mcr<-complete_mcr_als(treated2d, final_comp, 'Treated')
 treated_spectra<-treated_mcr$spectra
-treated_comp<-treated_mcr$comp
+treated_spectra<-treated_mcr$spectra
 # treated spectra: [1:59,1]
 print(Sys.time()-start) # Takes 33.9 min to complete
-output<-complete_howells_game(final_comp, treated_comp)
+output<-complete_howells_game(final_spectra, treated_spectra)
 # plotGamesHowell
 ```
