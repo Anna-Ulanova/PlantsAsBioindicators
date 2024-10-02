@@ -43,7 +43,6 @@ grouping_VNIR_files<-function(){
   # Creates a summary chart with each files directory and group ID
   for (file in spectral_files){
     row<-reference_dir_txt[sapply(reference_dir_txt$Partial.directory, function(x) grepl(x, file, fixed = TRUE)), ]
-    print(row)
     appending<-list(file, row$GroupAssigned)
     group_summary=rbind(group_summary, appending)
   }
@@ -52,8 +51,8 @@ grouping_VNIR_files<-function(){
   colnames(dfgroup_summary)<-group_summary[1,]
   # grouped<-dfgroup_summary %>% group_by(Group) %>%
   # group_split()
+  print('grouping_VNIR_files-- complete')
   assigning_control_v_treated(dfgroup_summary)
-  print('assigning_control_v_treated-- complete')
 }
 ```
 
@@ -66,95 +65,131 @@ assigning_control_v_treated<-function(grouped){
   control<- grouped%>%filter(Group=='SG_As_0')
   treatment5<-grouped%>%filter(Group=='SG_As_5')
   type<-"SG_As_control_v_5ppm"
-  if (dim(control)>0)
-  launching_analysis(control, treatment5, type)
+  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment5, type)
+  }
   
   treatment15<-grouped%>%filter(Group=='SG_As_15')
   type<-"SG_As_control_v_15ppm"
-  launching_analysis(control, treatment5, type)
-
-  treatment25<-grouped%>%fiter(Group=='SG_As_25')
+  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment15, type)
+  }
+  treatment25<-grouped%>%filter(Group=='SG_As_25')
   type<-"SG_As_control_v_25ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
+    print('type found')  
+    
+    launching_analysis(control, treatment25, type)
+  }
   # PRG As run
   control<- grouped%>%filter(Group=='PRG_As_0')
   
   treatment5<-grouped%>%filter(Group=='PRG_As_5')
   type<-"PGR_As_control_v_5ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment5, type)
+  }
   treatment15<-grouped%>%filter(Group=='PRG_As_15')
   type<-"PGR_As_control_vs_15ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment15, type)
+  }
   
-  treatment25<-grouped%>%fiter(Group=='PRG_As_25')
+  treatment25<-grouped%>%filter(Group=='PRG_As_25')
   type<-"PGR_As_control_v_25ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment25, type)
+  }
   # Bahia As run
   control<- grouped%>%filter(Group=='bahia_As_0')
-
+  
   treatment5<-grouped%>%filter(Group=='bahia_As_5')
   type<-"bahia_As_control_v_5ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment5, type)
+  }
   treatment15<-grouped%>%filter(Group=='bahia_As_15')
   type<-"bahia_As_control_v_15ppm"
-  launching_analysis(control, treatment5, type)
-
-  treatment25<-grouped%>%fiter(Group=='bahia_As_25')
+  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment15, type)
+  }
+  treatment25<-grouped%>%filter(Group=='bahia_As_25')
   type<-"bahia_As_control_v_25ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment25, type)
+  }
   #-----------------------Se treatment-----------------------#
   # SG Sel run
   control<- grouped%>%filter(Group=='SG_Sel_0')
   
   treatment5<-grouped%>%filter(Group=='SG_Sel_5')
   type<-"SG_Sel_control_v_5ppm"
-  launching_analysis(control, treatment5, type)
-
-
+  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment5, type)  
+  }
   treatment15<-grouped%>%filter(Group=='SG_Sel_15')
   type<-"SG_Sel_control_v_15pp"
-  launching_analysis(control, treatment5, type)
-
-  treatment25<-grouped%>%fiter(Group=='SG_Sel_25')
+  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment15, type)  
+  }  
+  treatment25<-grouped%>%filter(Group=='SG_Sel_25')
   type<-"SG_Sel_control_v_25ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment25, type)  
+  }  
   # PRG Sel run
   control<- grouped%>%filter(Group=='PRG_Sel_0')
   
   treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
   type<-"PRG_Sel_control_v_5ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment5, type)  
+  }  
   treatment15<-grouped%>%filter(Group=='PRG_Sel_15')
   type<-"PRG_Sel_control_v_15ppm"
-  launching_analysis(control, treatment5, type)
-
-  treatment25<-grouped%>%fiter(Group=='PRG_Sel_25')
+  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment15, type)  
+  }  
+  treatment25<-grouped%>%filter(Group=='PRG_Sel_25')
   type<-"PRG_Sel_control_v_25ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment25, type)  
+  }  
   # Bahia Sel run
   control<- grouped%>%filter(Group=='bahia_Sel_0')
   
   treatment5<-grouped%>%filter(Group=='bahia_Sel_5')
   type<-"bahia_Sel_control_v_5ppm"
-  launching_analysis(control, treatment5, type)
-
+  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment5, type)  
+  }  
   treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
   type<-"bahia_Sel_control_v_15ppm"
-  launching_analysis(control, treatment5, type)
-
-  treatment25<-grouped%>%fiter(Group=='bahia_Sel_25') 
+  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment15, type)  
+  }  
+  treatment25<-grouped%>%filter(Group=='bahia_Sel_25') 
   type<-"bahia_Sel_control_v_ppm"
-  launching_analysis(control, treatment5, type)
-}
+  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
+    print('type found')  
+    launching_analysis(control, treatment25, type)  
+  }}
 ```
 
 ```{r}
@@ -177,19 +212,24 @@ open_combine_rasters<-function(summary_per_group){
   group_dirs<-summary_per_group$Dir
   # Creates empty matrix that will follow the converted 2D matrix form of (col*row, nbands)
   # Since the sampled matrix will be 100*100*59, we will create 1,10000
-  raster_group_summary<-matrix(nrow=1, ncol=100*100)
+  raster_group_summary<-matrix(0, nrow=100*100, ncol=1)
   for (dir in group_dirs){
+    print(dir)
     raster<-stack(dir)
     mask<-creating_conditions(raster)
+    print('mask created')
     mask_red<-mask$red
     mask_ob_avg<-mask$ob
     mask_r_bg_avg<-mask$rbg
     
-    reclassified_raster<-classifying_raster_based_on_conditions(mask_red, mask_ob_avg, mask_r_bg_avg)
+    reclassified_raster<-classify_raster_based_on_conditions(mask_red, mask_ob_avg, mask_r_bg_avg)
+    plot(reclassified_raster)
     subset<-stacking_selected_bands(raster)
     masked_subset<-applying_mask_on_subset(raster, reclassified_raster)
     cropped_raster<-applying_spatial_subset(masked_subset)
     cropped_2D<-convert_to_2d(cropped_raster)
+    cat('Dimension of 2D cropped df: ',dim(cropped_2D),'\n')
+    cat('Dimension of raster group summary df:', dim(raster_group_summary),'\n')
     raster_group_summary<-rbind(raster_group_summary, cropped_2D)
   }
   return(raster_group_summary)
@@ -202,15 +242,17 @@ applying_spatial_subset<-function(raster){
   first_layer<-raster[[1]]
   rows<-dim(raster)[1]
   columns<-dim(raster)[2]
+  cat('selected raster is: ' , dim(raster),'\n')
   predominantly_zero=TRUE
-  subset_raster<-matrix(0, nrow=100, ncol=100)
-  while (predominantly_nonzero){
-    random_r<-sample(100:(rows-100),1)
-    random_c<-sample(100:(columns-100),1)
+  subset_raster<-matrix(0, nrow=1, ncol=59)
+  cat("parent raster is: ", dim(subset_raster),'\n')
+  while (predominantly_zero){
+    random_r<-sample(99:(rows-100),1)
+    random_c<-sample(99:(columns-100),1)
     row_min <-random_r-50
-    row_max <-random_r+50
+    row_max <-random_r+49
     col_min <-random_c-50
-    col_max <-random_c+50
+    col_max <-random_c+49
     # Extract the 100x100 square
     subset_raster <- crop(first_layer, extent(first_layer, col_min, col_max, row_min, row_max))
     
@@ -227,6 +269,7 @@ applying_spatial_subset<-function(raster){
     if (non_zero_percentage >= 60){
       predominantly_zero=FALSE
       raster<-crop(raster, extent(raster, col_min, col_max, row_min, row_max))
+      cat("DIMENSIONS OF 3D CROPPED RASTER: ", dim(raster), '\n')
       return(raster)
     }
   }
@@ -259,6 +302,7 @@ COMPLETES OTSU'S METHOD
 ```{r}
 
 creating_conditions <- function(Hyp_As_col3_16_3) {
+  cat('creating conditions')
   #Averaging red between 750 and 850nm
   Red_avg <- raster::mean(Hyp_As_col3_16_3[[180:204]])
   
@@ -315,7 +359,6 @@ creating_conditions <- function(Hyp_As_col3_16_3) {
 
 CREATES BINARY MASK BASED ON CONDITIONS
 ```{r}
-
 classify_raster_based_on_conditions <-
   function(red_cutoff_raster,
            orange_blue_avg_raster,
@@ -346,7 +389,7 @@ classify_raster_based_on_conditions <-
         reclassify_function(x[1], x[2], x[3])
       }
     )
-    print(dim(reclassified_raster))
+    cat('Reclassified raster dimensions: ',dim(reclassified_raster),'\n')
     return(reclassified_raster)
   }
 
@@ -521,8 +564,8 @@ complete_howells_game<-function(control, treated, name){
   
   # Perform the Games-Howell test
   gh_results <- posthocTGH(y = compiled_spectra$Spectra, 
-                         x = compiled_spectra$Group, 
-                         method = "games-howell")
+                           x = compiled_spectra$Group, 
+                           method = "games-howell")
   
   # Extract mean and confidence intervals for plotting
   means <- tapply(compiled_spectra$Spectra, compiled_spectra$Group, mean)
@@ -563,105 +606,59 @@ complete_howells_game<-function(control, treated, name){
   
   # 5. Save the summary to a CSV file
   write.csv(summary_df, paste('D:/Reflectance summary/', name, '_summary.txt'), row.names = FALSE)
-  
 }
-# complete_howells_game <- function(control, treated) {
-#   # Combine the data into a single data frame
-#   compiled_data <-
-#     data.frame(
-#       Group = rep(c("Treated", "Control1", "Control2"), each = 59),
-#       Value = c(treated_spectra, control_spectra[, 1], control_spectra[, 2])
-#     )
-#   
-#   # Perform Games-Howell test
-#   #https://rdocumentation.org/packages/userfriendlyscience/versions/0.7.2/topics/posthocTGH
-#   gh_test <-
-#     posthocTGH(y = compiled_data$Value,
-#                x = compiled_data$Group,
-#                method = "games-howell")
-#   return(list(test=gh_test, compiled_data=compiled_data))
-# }
-# ```
-# 
-# ```{r Optional chunk- plots only means}
-# 
-# plotGamesHowell <- function(compiled_data) {
-#   # Extract mean and confidence intervals from the test results
-#   means <- tapply(compiled_data$Value, compiled_data$Group, mean)
-#   ci <- tapply(compiled_data$Value, compiled_data$Group, function(x) {
-#     c(
-#       mean(x) - qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x)),
-#       mean(x) + qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x))
-#     )
-#   })
-#   
-#   # Prepare data for plotting
-#   plot_data <- data.frame(
-#     Group = names(means),
-#     Mean = as.numeric(means),
-#     CI_Lower = sapply(ci, `[`, 1),
-#     CI_Upper = sapply(ci, `[`, 2)
-#   )
-#   
-#   # Create the plot
-#   ggplot(plot_data, aes(x = Group, y = Mean)) +
-#     geom_point(size = 3) +
-#     geom_errorbar(aes(ymin = CI_Lower, ymax = CI_Upper), width = 0.2) +
-#     labs(title = "Mean Spectral Values by Group with 95% Confidence Intervals",
-#          x = "Group", y = "Mean Spectral Value") +
-#     theme_minimal()
-# }
 ```
 MAIN
 ```{r}
 
-control<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/14_1_20230724_2023_07_24_12_33_04/raw_rd_rf')
-treated<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/4_1_20230724_2023_07_24_09_00_14/raw_rd_rf')
-
-control_mask<-creating_conditions(control)
-control_red_cutoff<-control_mask$red
-control_ob_avg<-control_mask$ob
-control_r_bg_avg<-control_mask$rbg
-
-control_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = control_red_cutoff, orange_blue_avg_raster = control_ob_avg, red_bg_avg_raster = control_r_bg_avg)
-
-
-treated_mask<-creating_conditions(treated)
-treated_red_cutoff<-treated_mask$red
-treated_ob_avg<-treated_mask$ob
-treated_r_bg_avg<-treated_mask$rbg
-
-treated_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = treated_red_cutoff, orange_blue_avg_raster = treated_ob_avg, red_bg_avg_raster = treated_r_bg_avg)
-
-
-plot(treated_reclassified_raster)
-
-
-control_subset<-stacking_selected_bands(control)
-
-treated_subset<-stacking_selected_bands(treated)
-
-masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
-masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
-
-control2d<-convert_to_2d(masked_control_subset)
-treated2d<-convert_to_2d(masked_treated_subset)
-
-initial_comp<-complete_pca(control2d)
+# control<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/14_1_20230724_2023_07_24_12_33_04/raw_rd_rf')
+# treated<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/4_1_20230724_2023_07_24_09_00_14/raw_rd_rf')
 # 
-# na_control<-convert_to_zero(control2d)
+# control_mask<-creating_conditions(control)
+# control_red_cutoff<-control_mask$red
+# control_ob_avg<-control_mask$ob
+# control_r_bg_avg<-control_mask$rbg
 # 
-# na_treated<- convert_to_zero(treated2d)
-
-control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
-final_spectra<-control_mcr$spectra
-control_spectra<-control_mcr$spectra
-# control spectra: [1:59, 1:2]
-treated_mcr<-complete_mcr_als(treated2d, final_comp, 'Treated')
-treated_spectra<-treated_mcr$spectra
-treated_spectra<-treated_mcr$spectra
-# treated spectra: [1:59,1]
-print(Sys.time()-start) # Takes 33.9 min to complete
-output<-complete_howells_game(final_spectra, treated_spectra)
+# control_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = control_red_cutoff, orange_blue_avg_raster = control_ob_avg, red_bg_avg_raster = control_r_bg_avg)
+# plot(control_reclassified_raster)
+# # 
+# treated_mask<-creating_conditions(treated)
+# treated_red_cutoff<-treated_mask$red
+# treated_ob_avg<-treated_mask$ob
+# treated_r_bg_avg<-treated_mask$rbg
+# 
+# treated_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = treated_red_cutoff, orange_blue_avg_raster = treated_ob_avg, red_bg_avg_raster = treated_r_bg_avg)
+# 
+# 
+# plot(treated_reclassified_raster)
+# 
+# 
+# control_subset<-stacking_selected_bands(control)
+# 
+# treated_subset<-stacking_selected_bands(treated)
+# 
+# masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
+# masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
+# 
+# control2d<-convert_to_2d(masked_control_subset)
+# treated2d<-convert_to_2d(masked_treated_subset)
+# 
+# initial_comp<-complete_pca(control2d)
+# #
+# # na_control<-convert_to_zero(control2d)
+# #
+# # na_treated<- convert_to_zero(treated2d)
+# 
+# control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
+# final_spectra<-control_mcr$spectra
+# control_spectra<-control_mcr$spectra
+# # control spectra: [1:59, 1:2]
+# treated_mcr<-complete_mcr_als(treated2d, final_comp, 'Treated')
+# treated_spectra<-treated_mcr$spectra
+# treated_spectra<-treated_mcr$spectra
+# # treated spectra: [1:59,1]
+# print(Sys.time()-start) # Takes 33.9 min to complete
+# output<-complete_howells_game(final_spectra, treated_spectra)
 # plotGamesHowell
+
 ```
