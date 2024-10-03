@@ -196,13 +196,13 @@ assigning_control_v_treated<-function(grouped){
 launching_analysis<-function(group1, group2, type){
   control<-open_combine_rasters(group1)
   treated<-open_combine_rasters(group2)
-  intial_comp<-complete_pca(control)
-  control_mcr<-complete_mcr_als(control2d, initial_comp, '')
+  initial_comp<-complete_pca(control)
+  control_mcr<-complete_mcr_als(control, initial_comp, '')
+  control_spectra<-control_mcr$spectra
   final_comp<-control_mcr$spectra
   treated_mcr<-complete_mcr_als(treated, final_comp, '')
   treated_spectra<-treated_mcr$spectra
-  treated_comp<-treated_mcr$comp
-  output<-complete_howells_game(final_comp, treated_comp, type)
+  output<-complete_howells_game(control_spectra, treated_spectra, type)
 }
 ```
 
@@ -212,7 +212,7 @@ open_combine_rasters<-function(summary_per_group){
   group_dirs<-summary_per_group$Dir
   # Creates empty matrix that will follow the converted 2D matrix form of (col*row, nbands)
   # Since the sampled matrix will be 100*100*59, we will create 1,10000
-  raster_group_summary<-matrix(0, nrow=100*100, ncol=1)
+  raster_group_summary<-matrix(0, nrow=1, ncol=59)
   for (dir in group_dirs){
     print(dir)
     raster<-stack(dir)
@@ -223,9 +223,8 @@ open_combine_rasters<-function(summary_per_group){
     mask_r_bg_avg<-mask$rbg
     
     reclassified_raster<-classify_raster_based_on_conditions(mask_red, mask_ob_avg, mask_r_bg_avg)
-    plot(reclassified_raster)
     subset<-stacking_selected_bands(raster)
-    masked_subset<-applying_mask_on_subset(raster, reclassified_raster)
+    masked_subset<-applying_mask_on_subset(subset, reclassified_raster)
     cropped_raster<-applying_spatial_subset(masked_subset)
     cropped_2D<-convert_to_2d(cropped_raster)
     cat('Dimension of 2D cropped df: ',dim(cropped_2D),'\n')
@@ -349,7 +348,7 @@ creating_conditions <- function(Hyp_As_col3_16_3) {
       }
     )
   # Plot to visualize
-  plot(Red_cutoff)
+  # plot(Red_cutoff)
   return(list(red = Red_cutoff, ob = O_B_avg, rbg = R_BG_avg))
 }
 
