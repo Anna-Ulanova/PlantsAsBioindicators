@@ -35,7 +35,7 @@ start = Sys.time()
 -- 
 --EX: D:\VNIR\GH_20230724\16_3_20230724_2023_07_24_13_10_38
 
-```{r Polished and debugged}
+```{r Polished and debugged, check whether As or Sel}
 grouping_VNIR_files<-function(){
   spectral_files<-list.files(path='D:/VNIR/GH_20231213', pattern='raw_rd_rf$', recursive=TRUE, full.names= TRUE)
   reference_dir_txt<- read.csv('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/reference_sheet.txt', sep='\t')
@@ -59,160 +59,195 @@ grouping_VNIR_files<-function(){
 
 ```{r Polished and debugged}
 assigning_control_v_treated<-function(grouped){
+  # Assuming 'grouped' has a 'Group' column and multiple rows to iterate through
+  for (i in 1:nrow(grouped)) {
+    row <- grouped[i, ]
+  # Check if the row corresponds to the control group (SG_Sel_0)
+    if (row$Group == 'SG_Sel_0') {
+      # Assign the control group based on the condition
+      control_group <- grouped[grouped$Group == 'SG_Sel_0', ]
+      # Manually assigning treatment groups by filtering the dataframe
+      treatment_groups <- list(
+        SG_Sel_5 = grouped[grouped$Group == 'SG_Sel_5', ],
+        SG_Sel_15 = grouped[grouped$Group == 'SG_Sel_15', ],
+        SG_Sel_25 = grouped[grouped$Group == 'SG_Sel_25', ])
+      
+      # Assign corresponding types for each comparison
+      types <- list('SG_Sel_control_v_5ppm', 'SG_Sel_control_v_15ppm', 'SG_Sel_control_v_25ppm')
   
-  #-----------------------As treatment-----------------------#
-  # SG As run
-  control<- grouped%>%filter(Group=='SG_As_0')
-  treatment5<-grouped%>%filter(Group=='SG_As_5')
-  type<-"SG_As_control_v_5ppm"
-  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment5, type)
+      # Loop through treatment groups and run launching_analysis
+      results <- mapply(function(treatment, type) {
+        launching_analysis(control_group, treatment, type)
+      }, treatment_groups, types, SIMPLIFY = FALSE)
+    }
   }
-  
-  treatment15<-grouped%>%filter(Group=='SG_As_15')
-  type<-"SG_As_control_v_15ppm"
-  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment15, type)
-  }
-  treatment25<-grouped%>%filter(Group=='SG_As_25')
-  type<-"SG_As_control_v_25ppm"
-  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
-    print('type found')  
-    
-    launching_analysis(control, treatment25, type)
-  }
-  # PRG As run
-  control<- grouped%>%filter(Group=='PRG_As_0')
-  
-  treatment5<-grouped%>%filter(Group=='PRG_As_5')
-  type<-"PGR_As_control_v_5ppm"
-  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment5, type)
-  }
-  treatment15<-grouped%>%filter(Group=='PRG_As_15')
-  type<-"PGR_As_control_vs_15ppm"
-  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment15, type)
-  }
-  
-  treatment25<-grouped%>%filter(Group=='PRG_As_25')
-  type<-"PGR_As_control_v_25ppm"
-  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment25, type)
-  }
-  # Bahia As run
-  control<- grouped%>%filter(Group=='bahia_As_0')
-  
-  treatment5<-grouped%>%filter(Group=='bahia_As_5')
-  type<-"bahia_As_control_v_5ppm"
-  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment5, type)
-  }
-  treatment15<-grouped%>%filter(Group=='bahia_As_15')
-  type<-"bahia_As_control_v_15ppm"
-  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment15, type)
-  }
-  treatment25<-grouped%>%filter(Group=='bahia_As_25')
-  type<-"bahia_As_control_v_25ppm"
-  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment25, type)
-  }
-  #-----------------------Se treatment-----------------------#
-  # SG Sel run
-  control<- grouped%>%filter(Group=='SG_Sel_0')
-  
-  treatment5<-grouped%>%filter(Group=='SG_Sel_5')
-  type<-"SG_Sel_control_v_5ppm"
-  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment5, type)  
-  }
-  treatment15<-grouped%>%filter(Group=='SG_Sel_15')
-  type<-"SG_Sel_control_v_15pp"
-  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment15, type)  
-  }  
-  treatment25<-grouped%>%filter(Group=='SG_Sel_25')
-  type<-"SG_Sel_control_v_25ppm"
-  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment25, type)  
-  }  
-  # PRG Sel run
-  control<- grouped%>%filter(Group=='PRG_Sel_0')
-  
-  treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
-  type<-"PRG_Sel_control_v_5ppm"
-  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment5, type)  
-  }  
-  treatment15<-grouped%>%filter(Group=='PRG_Sel_15')
-  type<-"PRG_Sel_control_v_15ppm"
-  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment15, type)  
-  }  
-  treatment25<-grouped%>%filter(Group=='PRG_Sel_25')
-  type<-"PRG_Sel_control_v_25ppm"
-  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment25, type)  
-  }  
-  # Bahia Sel run
-  control<- grouped%>%filter(Group=='bahia_Sel_0')
-  
-  treatment5<-grouped%>%filter(Group=='bahia_Sel_5')
-  type<-"bahia_Sel_control_v_5ppm"
-  if (dim(control)[1]>0 || dim(treatment5)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment5, type)  
-  }  
-  treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
-  type<-"bahia_Sel_control_v_15ppm"
-  if (dim(control)[1]>0 || dim(treatment15)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment15, type)  
-  }  
-  treatment25<-grouped%>%filter(Group=='bahia_Sel_25') 
-  type<-"bahia_Sel_control_v_ppm"
-  if (dim(control)[1]>0 || dim(treatment25)[1]>0){
-    print('type found')  
-    launching_analysis(control, treatment25, type)  
-  }}
+}
+    #   cat('row: ', row)
+  #   #-----------------------As treatment-----------------------#
+  #   # SG As run
+  #   control<- grouped%>%filter(Group=='SG_As_0')
+  #   treatment5<-grouped%>%filter(Group=='SG_As_5')
+  #   type<-"SG_As_control_v_5ppm"
+  #   if (dim(control)[1]>0 & dim(treatment5)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment5, type)
+  #   }
+  #   
+  #   treatment15<-grouped%>%filter(Group=='SG_As_15')
+  #   type<-"SG_As_control_v_15ppm"
+  #   if (dim(control)[1]>0 & dim(treatment15)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment15, type)
+  #   }
+  #   treatment25<-grouped%>%filter(Group=='SG_As_25')
+  #   type<-"SG_As_control_v_25ppm"
+  #   if (dim(control)[1]>0 & dim(treatment25)[1]>0){
+  #     print('type found')  
+  #     
+  #     launching_analysis(control, treatment25, type)
+  #   }
+  #   # PRG As run
+  #   control<- grouped%>%filter(Group=='PRG_As_0')
+  #   
+  #   treatment5<-grouped%>%filter(Group=='PRG_As_5')
+  #   type<-"PGR_As_control_v_5ppm"
+  #   if (dim(control)[1]>0 & dim(treatment5)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment5, type)
+  #   }
+  #   treatment15<-grouped%>%filter(Group=='PRG_As_15')
+  #   type<-"PGR_As_control_vs_15ppm"
+  #   if (dim(control)[1]>0 & dim(treatment15)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment15, type)
+  #   }
+  #   
+  #   treatment25<-grouped%>%filter(Group=='PRG_As_25')
+  #   type<-"PGR_As_control_v_25ppm"
+  #   if (dim(control)[1]>0 & dim(treatment25)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment25, type)
+  #   }
+  #   # Bahia As run
+  #   control<- grouped%>%filter(Group=='bahia_As_0')
+  #   
+  #   treatment5<-grouped%>%filter(Group=='bahia_As_5')
+  #   type<-"bahia_As_control_v_5ppm"
+  #   if (dim(control)[1]>0 & dim(treatment5)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment5, type)
+  #   }
+  #   treatment15<-grouped%>%filter(Group=='bahia_As_15')
+  #   type<-"bahia_As_control_v_15ppm"
+  #   if (dim(control)[1]>0 & dim(treatment15)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment15, type)
+  #   }
+  #   treatment25<-grouped%>%filter(Group=='bahia_As_25')
+  #   type<-"bahia_As_control_v_25ppm"
+  #   if (dim(control)[1]>0 & dim(treatment25)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment25, type)
+  #   }
+  #   #-----------------------Se treatment-----------------------#
+  #   # SG Sel run
+  #   control<- grouped%>%filter(Group=='SG_Sel_0')
+  #   
+  #   treatment5<-grouped%>%filter(Group=='SG_Sel_5')
+  #   type<-"SG_Sel_control_v_5ppm"
+  #   if (dim(control)[1]>0 & dim(treatment5)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment5, type)  
+  #   }
+  #   treatment15<-grouped%>%filter(Group=='SG_Sel_15')
+  #   type<-"SG_Sel_control_v_15pp"
+  #   if (dim(control)[1]>0 & dim(treatment15)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment15, type)  
+  #   }  
+  #   treatment25<-grouped%>%filter(Group=='SG_Sel_25')
+  #   type<-"SG_Sel_control_v_25ppm"
+  #   if (dim(control)[1]>0 & dim(treatment25)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment25, type)  
+  #   }  
+  #   # PRG Sel run
+  #   control<- grouped%>%filter(Group=='PRG_Sel_0')
+  #   
+  #   treatment5<-grouped%>%filter(Group=='PRG_Sel_5')
+  #   type<-"PRG_Sel_control_v_5ppm"
+  #   if (dim(control)[1]>0 & dim(treatment5)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment5, type)  
+  #   }  
+  #   treatment15<-grouped%>%filter(Group=='PRG_Sel_15')
+  #   type<-"PRG_Sel_control_v_15ppm"
+  #   if (dim(control)[1]>0 & dim(treatment15)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment15, type)  
+  #   }  
+  #   treatment25<-grouped%>%filter(Group=='PRG_Sel_25')
+  #   type<-"PRG_Sel_control_v_25ppm"
+  #   if (dim(control)[1]>0 & dim(treatment25)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment25, type)  
+  #   }  
+  #   # Bahia Sel run
+  #   control<- grouped%>%filter(Group=='bahia_Sel_0')
+  #   
+  #   treatment5<-grouped%>%filter(Group=='bahia_Sel_5')
+  #   type<-"bahia_Sel_control_v_5ppm"
+  #   if (dim(control)[1]>0 & dim(treatment5)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment5, type)  
+  #   }  
+  #   treatment15<-grouped%>%filter(Group=='bahia_Sel_15')
+  #   type<-"bahia_Sel_control_v_15ppm"
+  #   if (dim(control)[1]>0 & dim(treatment15)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment15, type)  
+  #   }  
+  #   treatment25<-grouped%>%filter(Group=='bahia_Sel_25') 
+  #   type<-"bahia_Sel_control_v_ppm"
+  #   if (dim(control)[1]>0 & dim(treatment25)[1]>0){
+  #     print('type found')  
+  #     launching_analysis(control, treatment25, type)  
+  #   }
+  #   print(control)
+  #   print('-----')
+  # }
 ```
-
+- Takes the directories for each group, and completes pre-processing as well as analysis for control vs grouped
 ```{r}
 launching_analysis<-function(group1, group2, type){
-  control<-open_combine_rasters(group1)
-  treated<-open_combine_rasters(group2)
+  raster_group_summary<-matrix(1, nrow=1, ncol=59)
+  control<-open_combine_rasters(group1, raster_group_summary, 'control')
+  treated<-open_combine_rasters(group2, raster_group_summary, 'treatment')
+  print('Rasters have been combined')
   initial_comp<-complete_pca(control)
+  cat('Initial component is: ', initial_comp)
+  print('PCA success')
   control_mcr<-complete_mcr_als(control, initial_comp, '')
+  cat('MCR component is: ', control_mcr$comp)
+  print('Control MCR success')
   control_spectra<-control_mcr$spectra
-  final_comp<-control_mcr$spectra
+  write.csv(control_spectra,'D:/VNIR/control_spectral.csv')
+  final_comp<-control_mcr$comp
   treated_mcr<-complete_mcr_als(treated, final_comp, '')
+  print('Treated MCR success')
   treated_spectra<-treated_mcr$spectra
+  cat('Treated spectra: ', dim(treated_spectra), '\n')
+  cat('Control spectra: ', dim(control_spectra), '\n')
   output<-complete_howells_game(control_spectra, treated_spectra, type)
 }
 ```
 
 Iterates by each raster directory, applying mask and filter, converting to 2D, appending to overall group 
 ```{r}
-open_combine_rasters<-function(summary_per_group){
+open_combine_rasters<-function(summary_per_group, raster_group_summary,type){
   group_dirs<-summary_per_group$Dir
   # Creates empty matrix that will follow the converted 2D matrix form of (col*row, nbands)
   # Since the sampled matrix will be 100*100*59, we will create 1,10000
-  raster_group_summary<-matrix(0, nrow=1, ncol=59)
   for (dir in group_dirs){
     print(dir)
     raster<-stack(dir)
@@ -225,12 +260,18 @@ open_combine_rasters<-function(summary_per_group){
     reclassified_raster<-classify_raster_based_on_conditions(mask_red, mask_ob_avg, mask_r_bg_avg)
     subset<-stacking_selected_bands(raster)
     masked_subset<-applying_mask_on_subset(subset, reclassified_raster)
+    # cropped raster should have dimensions of [100,100,59]--> [10000,59]
     cropped_raster<-applying_spatial_subset(masked_subset)
     cropped_2D<-convert_to_2d(cropped_raster)
     cat('Dimension of 2D cropped df: ',dim(cropped_2D),'\n')
     cat('Dimension of raster group summary df:', dim(raster_group_summary),'\n')
+    print(raster_group_summary)
     raster_group_summary<-rbind(raster_group_summary, cropped_2D)
   }
+  
+  raster_group_summary<-raster_group_summary[-1,]
+  cat('Dimension of raster group summary df:', dim(raster_group_summary),'\n')
+  write.csv(raster_group_summary,paste('D:/Reflectance summary/one_matrix',"_",type, ".txt"))
   return(raster_group_summary)
 }
 ```
@@ -243,33 +284,39 @@ applying_spatial_subset<-function(raster){
   columns<-dim(raster)[2]
   cat('selected raster is: ' , dim(raster),'\n')
   predominantly_zero=TRUE
-  subset_raster<-matrix(0, nrow=1, ncol=59)
-  cat("parent raster is: ", dim(subset_raster),'\n')
+  # subset_raster<-matrix(0, nrow=1, ncol=59)
+  # cat("parent raster is: ", dim(subset_raster),'\n')
   while (predominantly_zero){
-    random_r<-sample(99:(rows-100),1)
-    random_c<-sample(99:(columns-100),1)
+    # Add no repeats
+    random_r<-sample(49:(rows-50),1, replace=FALSE)
+    random_c<-sample(49:(columns-50),1, replace=FALSE)
+    cat(random_r,random_c)
     row_min <-random_r-50
     row_max <-random_r+49
     col_min <-random_c-50
     col_max <-random_c+49
     # Extract the 100x100 square
-    subset_raster <- crop(first_layer, extent(first_layer, col_min, col_max, row_min, row_max))
+    subset_raster <- crop(first_layer, extent(first_layer, row_min, row_max, col_min, col_max))
     
     # Convert the square to a matrix for easier analysis
     square_values <- as.matrix(subset_raster)
     
     # Count non-zero values
-    non_zero_count <- sum(square_values != 0)
-    total_count <- length(square_values)
+    zero_count <- sum(square_values == 0)
+    total_count <-  total_count<-dim(square_values)[1]*dim(square_values)[2]
     
     # Calculate the percentage of non-zero values
-    non_zero_percentage <- (non_zero_count / total_count) * 100
+    zero_percentage <- (zero_count / total_count) * 100
     # Check if it's 60% or more
-    if (non_zero_percentage >= 60){
+    if (zero_percentage < 40){
+      print('not zero')
       predominantly_zero=FALSE
-      raster<-crop(raster, extent(raster, col_min, col_max, row_min, row_max))
-      cat("DIMENSIONS OF 3D CROPPED RASTER: ", dim(raster), '\n')
+      raster<-crop(raster, extent(raster,row_min, row_max, col_min, col_max))
+      # Dimensions of cropped 3D should always be 100*100*59
+      # cat("DIMENSIONS OF 3D CROPPED RASTER: ", dim(raster), '\n')
       return(raster)
+    }else{
+      print('Boohoo')
     }
   }
   
@@ -348,7 +395,7 @@ creating_conditions <- function(Hyp_As_col3_16_3) {
       }
     )
   # Plot to visualize
-  # plot(Red_cutoff)
+  plot(Red_cutoff)
   return(list(red = Red_cutoff, ob = O_B_avg, rbg = R_BG_avg))
 }
 
@@ -444,13 +491,13 @@ complete_pca <- function(matrix) {
   eigenvalues <- pca_result$sdev ^ 2
   # Remove comment if you want to see the Screen Plot
   # Create a scree plot to visualize eigenvalues and determine the number of components
-  # plot(
-  #   eigenvalues,
-  #   type = "b",
-  #   xlab = "Component",
-  #   ylab = "Eigenvalue",
-  #   main = "Scree Plot"
-  # )
+  plot(
+    eigenvalues,
+    type = "b",
+    xlab = "Component",
+    ylab = "Eigenvalue",
+    main = "Scree Plot"
+  )
   abline(h = 1, col = "red", lty = 2)  # Kaiser's rule threshold
   
   # Uses Kaiser-Guttman rule which suggest that "the elbow" in scree plots occurs
@@ -511,32 +558,32 @@ complete_mcr_als<-function(matrix2D, component, type){
   n_samples <- nrow(matrix2D)
   n_bands <- ncol(matrix2D)
   # Remove comment if you want to plot the MCR output
-  # title <-
-  #   paste0(type, ": Comparison of Original and Reconstructed Spectra")
-  # save_name <-
-  #   paste0(
-  #     'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/',
-  #     type,
-  #     '_mcr_als.jpg'
-  #   )
-  # # Plot for the first sample
-  # jpeg(file = save_name)
-  # plot(
-  #   1:n_bands,
-  #   matrix2D[3,],
-  #   type = "l",
-  #   col = "red",
-  #   xlab = "Wavelength/Band",
-  #   ylab = "Intensity",
-  #   main = title
-  # )
-  # lines(1:n_bands, reconstructed_spectra[3,], col = "blue")
-  # legend(
-  #   "topright",
-  #   legend = c("Original", "Reconstructed"),
-  #   col = c("red", "blue")
-  # )
-  # dev.off()
+  title <-
+    paste0(type, ": Comparison of Original and Reconstructed Spectra")
+  save_name <-
+    paste0(
+      'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/',
+      type,
+      '_mcr_als.jpg'
+    )
+  # Plot for the first sample
+  jpeg(file = save_name)
+  plot(
+    1:n_bands,
+    matrix2D[3,],
+    type = "l",
+    col = "red",
+    xlab = "Wavelength/Band",
+    ylab = "Intensity",
+    main = title
+  )
+  lines(1:n_bands, reconstructed_spectra[3,], col = "blue")
+  legend(
+    "topright",
+    legend = c("Original", "Reconstructed"),
+    col = c("red", "blue")
+  )
+  dev.off()
   #Complete PCA to find if the number of components has changed
   # # Eigenvalue calculation (using concentration profiles as an example)
   eigenvalues <- eigen(cov(reconstructed_spectra))$values
@@ -550,6 +597,7 @@ complete_mcr_als<-function(matrix2D, component, type){
 GAMES-HOWELL
 ```{r}
 complete_howells_game<-function(control, treated, name){
+  cat('-----Games-Howell Test Debugging-----', '\n')
   final_spectra_avg <- rowMeans(control)  # This takes the average of the two columns in final_spectra
   
   # Ensure that both final_spectra_avg and treated_spectra are vectors of the same length
@@ -560,7 +608,7 @@ complete_howells_game<-function(control, treated, name){
   
   # Combine the two datasets into one dataframe
   compiled_spectra <- rbind(control_spectra, treated_spectra_df)
-  
+  write.csv(compiled_spectra, 'D:/Reflectance summary/compiled_spectra.csv')
   # Perform the Games-Howell test
   gh_results <- posthocTGH(y = compiled_spectra$Spectra, 
                            x = compiled_spectra$Group, 
@@ -594,13 +642,13 @@ complete_howells_game<-function(control, treated, name){
   
   # 4. Prepare a summary dataframe
   summary_df <- data.frame(
-    Group1 = rownames(gh_summary),
-    Control = group_means[1,2],
-    Treated = group_means[2,2],
-    Diff = gh_summary$diff,
-    CI_Lower = gh_summary$ci.lo,
-    CI_Upper = gh_summary$ci.hi,
-    P_Value = gh_summary$p
+    Group1 = rownames(gh_results),
+    Control = means[1,2],
+    Treated = means[2,2],
+    Diff = gh_results$diff,
+    CI_Lower = gh_results$ci.lo,
+    CI_Upper = gh_results$ci.hi,
+    P_Value = gh_results$p
   )
   
   # 5. Save the summary to a CSV file
@@ -620,7 +668,7 @@ MAIN
 # 
 # control_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = control_red_cutoff, orange_blue_avg_raster = control_ob_avg, red_bg_avg_raster = control_r_bg_avg)
 # plot(control_reclassified_raster)
-# # 
+# #
 # treated_mask<-creating_conditions(treated)
 # treated_red_cutoff<-treated_mask$red
 # treated_ob_avg<-treated_mask$ob
@@ -638,10 +686,14 @@ MAIN
 # 
 # masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
 # masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
+
+# subset_control<-applying_spatial_subset(masked_control_subset)
 # 
 # control2d<-convert_to_2d(masked_control_subset)
 # treated2d<-convert_to_2d(masked_treated_subset)
 # 
+# write.csv(control2d, 'C:\\Users\\RDCRLAAU\\Desktop\\Plant_as_bioindicators\\MCR-ALS R Processing\\subset_testing_control.txt')
+# write.csv(treated2d, 'C:\\Users\\RDCRLAAU\\Desktop\\Plant_as_bioindicators\\MCR-ALS R Processing\\subset_testing_treatment.txt')
 # initial_comp<-complete_pca(control2d)
 # #
 # # na_control<-convert_to_zero(control2d)
@@ -649,15 +701,15 @@ MAIN
 # # na_treated<- convert_to_zero(treated2d)
 # 
 # control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
-# final_spectra<-control_mcr$spectra
 # control_spectra<-control_mcr$spectra
 # # control spectra: [1:59, 1:2]
-# treated_mcr<-complete_mcr_als(treated2d, final_comp, 'Treated')
+# treated_mcr<-complete_mcr_als(treated2d, control_mcr$comp, 'Treated')
 # treated_spectra<-treated_mcr$spectra
 # treated_spectra<-treated_mcr$spectra
 # # treated spectra: [1:59,1]
 # print(Sys.time()-start) # Takes 33.9 min to complete
-# output<-complete_howells_game(final_spectra, treated_spectra)
+# output<-complete_howells_game(control_spectra, treated_spectra)
 # plotGamesHowell
-
+grouping_VNIR_files()
+print(Sys.time()-start)
 ```
