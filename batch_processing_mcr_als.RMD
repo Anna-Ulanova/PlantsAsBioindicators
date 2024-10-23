@@ -1,0 +1,720 @@
+---
+title: "masking_pca_mcr_als_confirmation"
+author: "Anna Ulanova"
+date: "2024-08-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Testing out the method described in Ruffing et al.
+
+## R Markdown
+
+```{r}
+library(raster)
+
+library(tidyverse)
+library(ALS)
+library(summarytools)
+library(ggplot2)
+library(userfriendlyscience)
+library(car)
+library(dplyr)
+start = Sys.time()
+```
+1. Isolates all of the directories for VNIR and groups based on treatment, metal, grass
+- control Se, control As, 5 ppm Se & As, 15 ppm Se & As, 25 ppm Se & As
+-- Extract all directories that contain the file, raw_rd_rf
+-- Iterates by directories
+-- Separates by "/", and looks at the two elements
+-- Looks up the reference sheet by finding the row that has matching GH ID an tray number
+-- Isolates grass type, treatment, [ppm]
+-- Assigns As/Se for first separated element
+-- 
+--EX: D:\VNIR\GH_20230724\16_3_20230724_2023_07_24_13_10_38
+
+```{r Polished and debugged, check whether As or Sel}
+grouping_VNIR_files <- function() {
+  # CHANGE BACK
+  # spectral_files <-
+  #   list.files(
+  #     path = 'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands',
+  #     pattern='subraster',
+  #     recursive = TRUE,
+  #     full.names = TRUE  
+  #   )
+  spectral_files <-
+    list.files(
+      path = 'D:/VNIR',
+      pattern = 'raw_rd_rf$',
+      recursive = TRUE,
+      full.names = TRUE
+    )
+  # CHANGE BACK
+  reference_dir_txt <-
+    read.csv(
+      'D:/reference_sheet.csv')
+    # reference_dir_txt <-
+    # read.csv(
+    #   'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/reference_sheet - Copy.csv', sep=',')
+  group_summary <- list('Dir', 'Group')
+  # Creates a summary chart with each files directory and group ID
+  for (file in spectral_files) {
+    row <-
+      reference_dir_txt[sapply(reference_dir_txt$Partial.directory, function(x)
+        grepl(x, file, fixed = TRUE)),]
+    appending <- list(file, row$GroupAssigned)
+    group_summary = rbind(group_summary, appending)
+  }
+  # Groups by group ID
+  dfgroup_summary <- as.data.frame(group_summary[-1, ])
+  colnames(dfgroup_summary) <- group_summary[1, ]
+  # grouped<-dfgroup_summary %>% group_by(Group) %>%
+  # group_split()
+  # dfgroup_summary<-reference_dir_txt[1:2,10:11]
+  print('grouping_VNIR_files-- complete')
+  assigning_control_v_treated(dfgroup_summary)
+}
+```
+
+
+```{r Polished and debugged}
+assigning_control_v_treated<-function(grouped){
+  # Define the control groups and their corresponding treatments
+  control_treatment_mapping <- list(
+    SG_Sel_0 = c("SG_Sel_5", "SG_Sel_15", "SG_Sel_25"),
+    bahia_Sel_0 = c("bahia_Sel_5", "bahia_Sel_15", "bahia_Sel_25"),
+    PRG_Sel_0 = c("PRG_Sel_5", "PRG_Sel_15", "PRG_Sel_25"),
+    SG_As_0 = c("SG_As_5", "SG_As_15", "SG_As_25"),
+    bahia_As_0 = c("bahia_As_5", "bahia_As_15", "bahia_As_25"),
+    # CHANGE BACK
+    PRG_As_0 = c("PRG_As_5", "PRG_As_15", "PRG_As_25"))
+    #PRG_As_0 = c("PRG_As_15"))
+
+  control_type_names_mapping <- list(
+    SG_Sel_0 = c("SG_Sel_control_v_5", "SG_Sel_control_v_15", "SG_Sel_control_v_25"),
+    bahia_Sel_0 = c("bahia_Sel_control_v_5", "bahia_Sel_control_v_15", "bahia_Sel_control_v_25"),
+    PRG_Sel_0 = c("PRG_Sel_control_v_5", "PRG_Sel_control_v_15", "PRG_Sel_control_v_25"),
+    SG_As_0 = c("SG_As_control_v_5", "SG_As_control_v_15", "SG_As_control_v_25"),
+    bahia_As_0 = c("bahia_As_control_v_5", "bahia_As_control_v_15", "bahia_As_control_v_25"),
+    # CHANGE BACK
+    PRG_As_0 = c("PRG_As_control_v_5", "PRG_As_control_v_15", "PRG_As_control_v_25"))
+    #PRG_As_0 = c("PRG_As_control_v_15"))
+
+  # Iterate over each control group in the mapping
+  for (control in names(control_treatment_mapping)) {
+    # Extract the control directories
+    control_dirs <- grouped$Dir[grouped$Group == control]
+
+    # Extract the treatment groups for this control
+    treatment_groups <- control_treatment_mapping[[control]]
+
+    # Loop through each treatment group and match correctly
+    treatment_dirs_list <- list()
+
+    for (i in seq_along(treatment_groups)) {
+      treatment_group <- treatment_groups[i]
+      treatment_dirs <- grouped$Dir[grouped$Group == treatment_group]
+
+      # Add the treatment directories to the list
+      treatment_dirs_list[[i]] <- treatment_dirs
+    }
+
+    # Ensure the directories are correctly ordered and mapped to respective treatments
+    # CHANGE BACK
+    treatment5 <- treatment_dirs_list[[1]]
+    treatment15 <- treatment_dirs_list[[2]]
+    treatment25 <- treatment_dirs_list[[3]]
+
+    # Call the launching_analysis function with the correct treatment type mapping
+    # CHANGE BACK
+    launching_analysis(control_dirs, treatment5, control_type_names_mapping[[control]][1])
+    launching_analysis(control_dirs, treatment15, control_type_names_mapping[[control]][2])
+    launching_analysis(control_dirs, treatment25, control_type_names_mapping[[control]][3])
+  }
+}
+```
+- Takes the directories for each group, and completes pre-processing as well as analysis for control vs grouped
+```{r}
+
+launching_analysis <- function(group1, group2, type) {
+    raster_group_summary <- matrix(1, nrow = 1, ncol = 59)
+    # group= list of directories, raster_group_summary = blank summary matrix, type="control_vs_treatment_concentration"
+    control <-
+      open_combine_rasters(group1, raster_group_summary, 'control')
+    treated <-
+      open_combine_rasters(group2, raster_group_summary, 'treatment')
+    print('Rasters have been combined')
+    initial_comp <- complete_pca(control)
+    #cat('Initial component is: ', initial_comp)
+    print('PCA success')
+    control_mcr <- complete_mcr_als(control, initial_comp, '')
+    #cat('MCR component is: ', control_mcr$comp)
+    print('Control MCR success')
+    control_spectra <- control_mcr$spectra
+    #write.csv(control_spectra,'D:/VNIR/control_spectral.csv')
+    final_comp <- control_mcr$comp
+    treated_mcr <- complete_mcr_als(treated, final_comp, '')
+    print('Treated MCR success')
+    treated_spectra <- treated_mcr$spectra
+    #cat('Treated spectra: ', dim(treated_spectra), '\n')
+    #cat('Control spectra: ', dim(control_spectra), '\n')
+    output <-
+      complete_howells_game(control_spectra, treated_spectra, type)
+    
+}
+```
+
+Iterates by each raster directory, applying mask and filter, converting to 2D, appending to overall group 
+```{r}
+open_combine_rasters <-
+  function(summary_per_group,
+           raster_group_summary,
+           type) {
+    # Creates empty matrix that will follow the converted 2D matrix form of (col*row, nbands)
+    # Since the sampled matrix will be 100*100*59, we will create 1,10000
+    for (dir in summary_per_group) {
+      print(dir)
+      raster <- stack(dir)
+      mask <- creating_conditions(raster)
+      print('mask created')
+      mask_red <- mask$red
+      mask_ob_avg <- mask$ob
+      mask_r_bg_avg <- mask$rbg
+      
+      reclassified_raster <-
+        classify_raster_based_on_conditions(mask_red, mask_ob_avg, mask_r_bg_avg)
+      subset <- stacking_selected_bands(raster)
+      masked_subset <-
+        applying_mask_on_subset(subset, reclassified_raster)
+      # cropped raster should have dimensions of [100,100,59]--> [10000,59]
+      cropped_raster <- applying_spatial_subset(masked_subset)
+      print(dim(cropped_raster))
+      cropped_2D <- convert_to_2d(cropped_raster)
+      #cat('Dimension of 2D cropped df: ',dim(cropped_2D),'\n')
+      #cat('Dimension of raster group summary df:', dim(raster_group_summary),'\n')
+      #print(raster_group_summary)
+      print('open raster function--check point 1')
+      raster_group_summary <- rbind(raster_group_summary, cropped_2D)
+      print('open raster function--check point 2')
+    }
+    
+    raster_group_summary <- raster_group_summary[-1, ]
+    cat('Dimension of raster group summary df:',
+        dim(raster_group_summary),
+        '\n')
+    write.csv(
+      raster_group_summary,
+      paste('D:/Reflectance summary/one_matrix', "_", type, ".txt")
+    )
+    return(raster_group_summary)
+  }
+```
+
+Finds the 100*100 spatial subset of the raster by checking if the values are predominantly nonzero
+```{r}
+
+applying_spatial_subset <- function(raster) {
+  large_matrix <- raster[[1]]
+  nrow_large <- dim(raster)[1]
+  ncol_large <- dim(raster)[2]
+  # Size establishing the dimensions of the submatrix 100*100
+  submatrix_size <- 100
+  # Convert matrix to binary (1 for non-zero, 0 for zero) for easier counting
+  binary_matrix <- large_matrix != 0
+  
+   if (submatrix_size > nrow_large || submatrix_size > ncol_large) {
+    stop("Submatrix size is larger than the large matrix dimensions.")
+  }
+  
+  # Create a cumulative sum matrix to store non-zero counts up to each element
+  cumsum_matrix <- matrix(0, nrow = nrow_large + 1, ncol = ncol_large + 1)
+  
+  # Fill in the cumulative sum matrix
+  for (i in 1:nrow_large) {
+    for (j in 1:ncol_large) {
+      cumsum_matrix[i + 1, j + 1] <- binary_matrix[i, j] + 
+                                     cumsum_matrix[i, j + 1] + 
+                                     cumsum_matrix[i + 1, j] - 
+                                     cumsum_matrix[i, j]
+    }
+  }
+  
+  # Initialize variables to track the best submatrix
+  max_nonzero_count <- -1
+  best_row <- 1
+  best_col <- 1
+  
+  # Loop through all possible top-left corners of the submatrix
+  for (i in 1:(nrow_large - submatrix_size + 1)) {
+    for (j in 1:(ncol_large - submatrix_size + 1)) {
+      # Calculate the number of non-zero elements in the current submatrix
+      total_nonzero <- cumsum_matrix[i + submatrix_size, j + submatrix_size] -
+                       cumsum_matrix[i + submatrix_size, j] -
+                       cumsum_matrix[i, j + submatrix_size] +
+                       cumsum_matrix[i, j]
+      
+      # Update the best submatrix if this one has more non-zero elements
+      if (total_nonzero > max_nonzero_count) {
+        max_nonzero_count <- total_nonzero
+        best_row <- i
+        best_col <- j
+      }
+    }
+  }
+  
+  # Check the final bounds before cropping
+  if ((best_row + submatrix_size - 1) > nrow_large || 
+      (best_col + submatrix_size - 1) > ncol_large) {
+    stop("Submatrix coordinates exceed the dimensions of the large matrix.")
+  }
+  
+  # Crop and return the submatrix with the most non-zero values
+  cropped_raster <- raster::crop(raster, extent(raster,best_row,best_row + 99, 
+                                    best_col,best_col+99))
+  
+  return(cropped_raster)
+}
+  # # cat('selected raster is: ' , dim(raster),'\n')
+  # predominantly_zero = TRUE
+  # col_range = seq(75,(columns-75),75)
+  # row_range = seq(75,(rows-75),75)
+  # coordinates<-expand.grid(x=row_range, y=col_range)
+  # # subset_raster<-matrix(0, nrow=1, ncol=59)
+  # # cat("parent raster is: ", dim(subset_raster),'\n')
+  # while (predominantly_zero) {
+  #   # Add no repeats
+  #   shuffled_coordinates <- coordinates[sample(nrow(coordinates),1), ]
+  #   random_r <- shuffled_coordinates$x
+  #   random_c <- shuffled_coordinates$y
+  #   row_min <- random_r - 49
+  #   row_max <- random_r + 50
+  #   col_min <- random_c - 49
+  #   col_max <- random_c + 50
+  #   # Extract the 100x100 square
+  #   subset_raster <-
+  #     crop(first_layer,
+  #          extent(first_layer, row_min, row_max, col_min, col_max))
+  #   
+  #   # Convert the square to a matrix for easier analysis
+  #   square_values <- as.matrix(subset_raster)
+  #   
+  #   # Count zero values
+  #   zero_count <- sum(square_values == 0)
+  #   # Count total number of cells in matrix
+  #   total_count <-
+  #     total_count <- dim(square_values)[1] * dim(square_values)[2]
+  #   
+  #   # Calculate the percentage of non-zero values
+  #   zero_percentage <- (zero_count / total_count) * 100
+  #   # Check if it's 60% or more
+  #   if (zero_percentage <= 40) {
+  #     cat(random_r,',', random_c,'\n')
+  #     predominantly_zero = FALSE
+  #     raster <-
+  #       crop(raster,
+  #            extent(raster, row_min, row_max, col_min, col_max))
+  #     # Dimensions of cropped 3D should always be 100*100*59
+  #     cat("DIMENSIONS OF 3D CROPPED RASTER: ", dim(raster), '\n')
+  #     return(raster)
+  #   } else{
+  #       #print('')
+  #   }
+  # }
+# }
+```
+2. For each raster per group: 
+- Applies mask based on wavelength conditions
+- Assigns random point and checks if (1) the 100 * 100 square exists on raster
+(2) there are predominantly nonzero values in the outlined square 
+- Completes spatial subset of the raster and isolates reflectance values for all bands
+- Isolates the 59 bands used to make the masking conditions and creates a 100*100*59 raster
+- Repeats the process for each file per group, stacking the subsetted rasters together
+-- EX: if there are five files per group, the final raster will be 100*100*(59+5)
+
+
+
+
+3.Uses the compiled rasters for control vs treated groups for the rest of the steps
+- PCA
+- MCR-ALS
+- Games-Howell
+
+
+
+
+FINDS AND AVERAGES BANDS OF INTEREST
+FINDS REFLECTANCE RATIOS BASED ON WAVELENGTH CONDITIONS
+COMPLETES OTSU'S METHOD
+```{r}
+
+
+creating_conditions <- function(Hyp_As_col3_16_3) {
+  cat('creating conditions')
+  #Averaging red between 750 and 850nm
+  Red_avg <- mean(Hyp_As_col3_16_3[[180:204]])
+  #Averaging orange between 550 and 600
+  Orange_avg <- mean(Hyp_As_col3_16_3[[75:92]])
+  #Averaging blue between 410 and 450nm
+  Blue_avg <- mean(Hyp_As_col3_16_3[[10:25]])
+  #Averaging for a blue-green band, in the paper it claimes between 3 and 450nm which makes no sense.
+  #So I'm taking the liberty to make it between 450 and 550
+  Blue_Green_avg <- mean(Hyp_As_col3_16_3[[30:69]])
+  #Orange Average to Blue Average
+  O_B_avg <- Orange_avg / Blue_avg
+
+  #Red average to Blue-Green Average
+  R_BG_avg <- Red_avg / Blue_Green_avg
+  #Red Cutoff Threshold
+  # Step 1: Calculate the histogram
+  hist_values <-
+    hist(getValues(Red_avg), breaks = 256, plot = FALSE)
+  
+  # Step 2: Implement Otsu's method
+  # Compute probability distribution
+  p <- hist_values$counts / sum(hist_values$counts)
+  omega <- cumsum(p)
+  mu <- cumsum(p * hist_values$mids)
+  mu_t <- mu[length(mu)]
+  
+  # Compute between-class variance
+  sigma_b_squared <- (mu_t * omega - mu) ^ 2 / (omega * (1 - omega))
+  
+  # Find the maximum value of between-class variance
+  max_sigma_idx <- which.max(sigma_b_squared)
+  otsu_thresh <- hist_values$mids[max_sigma_idx]
+  
+  # Step 3: Apply the threshold
+  Red_cutoff <-
+    calc(
+      Red_avg,
+      fun = function(x) {
+        ifelse(x > otsu_thresh, 1, 0)
+      }
+    )
+  # Plot to visualize
+  # plot(Red_cutoff)
+  return(list(red = Red_cutoff, ob = O_B_avg, rbg = R_BG_avg))
+}
+
+```
+
+
+CREATES BINARY MASK BASED ON CONDITIONS
+```{r}
+
+classify_raster_based_on_conditions <-
+  function(red_cutoff_raster,
+           orange_blue_avg_raster,
+           red_bg_avg_raster) {
+    # Define a function to apply to each cell
+    reclassify_function <-
+      function(red_cutoff,
+               orange_blue_avg,
+               red_bg_avg) {
+        # Check the conditions and assign 1 or 0
+        condition1 <- red_cutoff == 1
+        condition2 <- (orange_blue_avg >= 1.75) | (red_bg_avg > 2.5)
+        
+        result <- ifelse(condition1 & condition2, 1, 0)
+        return(result)
+      }
+    
+    # Stack the rasters for easier cell-wise operations
+    raster_stack <-
+      stack(red_cutoff_raster,
+            orange_blue_avg_raster,
+            red_bg_avg_raster)
+    
+    # Apply the reclassification function to each cell
+    reclassified_raster <- calc(
+      raster_stack,
+      fun = function(x) {
+        reclassify_function(x[1], x[2], x[3])
+      }
+    )
+    # plot(reclassified_raster)
+    return(reclassified_raster)
+  }
+
+```
+
+STACKS ONLY RGB RASTERS
+```{r}
+
+
+stacking_selected_bands <- function(raster) {
+  #range<-list([10:25],[30:69], [75:92],[180:204])
+  red_stack <- raster[[180:204]]
+  orange_stack <- raster[[75:92]]
+  blue_green_stack <- raster[[30:69]]
+  blue_stack <- raster[[10:25]]
+  subset_raster <- stack(red_stack, orange_stack, blue_stack)
+  print('stacking_selected_bands--complete')
+  return(subset_raster)
+}
+
+```
+
+APPLIES BINARY MASK ONTO BAND-SUBSETTED RASTER
+
+```{r}
+
+applying_mask_on_subset <- function(mask, raster) {
+  masked <- mask * raster
+  print('applying_mask_on_subset--complete')
+  return(masked)
+}
+```
+
+
+CONVERTS HYPERCUBE TO 2D MATRIX
+```{r}
+
+convert_to_2d <- function(hypercube) {
+  print('lil cube')
+  matrix2D <-
+    matrix(
+      hypercube,
+      nrow = dim(hypercube)[1] * dim(hypercube)[2],
+      ncol = dim(hypercube)[3]
+    )
+  print('convert_to_2d --complete')
+  return(matrix2D)
+}
+```
+
+COMPLETES PCA, FINDS EIGENVALUES, USES KAISERS RULE TO DETERMINE NUMBER OF COMPONENTS
+```{r}
+
+complete_pca <- function(matrix) {
+  pca_result <- prcomp(matrix, scale. = TRUE)
+  
+  # Extract eigenvalues
+  eigenvalues <- pca_result$sdev ^ 2
+  # Remove comment if you want to see the Screen Plot
+  # Create a scree plot to visualize eigenvalues and determine the number of components
+  # plot(
+  #   eigenvalues,
+  #   type = "b",
+  #   xlab = "Component",
+  #   ylab = "Eigenvalue",
+  #   main = "Scree Plot"
+  # )
+  # abline(h = 1, col = "red", lty = 2)  # Kaiser's rule threshold
+  
+  # Uses Kaiser-Guttman rule which suggest that "the elbow" in scree plots occurs
+  # when the eigenvalues dip below 1.
+  # https://datasciencewiki.net/kaisers-rule/
+  num_components <- sum(eigenvalues > 1)
+  return(num_components)
+}
+```
+
+<!-- CONVERT ZEROS TO NANS -->
+<!-- 1) CONVERTS ALL ZEROS IN 2D MATRIX INTO NANS -->
+<!-- ```{R} -->
+<!-- convert_to_zero<- function(matrix2D){ -->
+<!--   nan_matrix<-gsub(0,NA, matrix2D) -->
+<!--   return(nan_matrix) -->
+<!-- } -->
+<!-- ``` -->
+
+CHUNKY MCR TASKS
+1) CREATES INITIAL CONCENTRATION/SPECTRAL GUESSES
+2) COMPLETES MCR-ALS
+3) PLOTS ORIGINAL DATA VS RECONSTRUCTED SPECTRA
+4) OUTPUTS NUMBER OF RELEVANT COMPONENTS FROM RECONSTRUCTED DATASET
+
+```{r}
+
+complete_mcr_als<-function(matrix2D, component, type){
+  # Step 1: Perform MCR-ALS on control_2d
+  # Initialize random matrices for MCR-ALS
+  initial_concentration_profiles <-
+    matrix(runif(nrow(matrix2D) * component),
+           nrow = nrow(matrix2D),
+           ncol = component)
+  initial_spectra <- matrix(runif(component * ncol(matrix2D)),
+                            nrow = ncol(matrix2D),
+                            ncol = component)
+  
+  # Run MCR-ALS on control_2d
+  mcr_result <- als(
+    CList = list(initial_concentration_profiles),
+    S = initial_spectra,
+    PsiList = list(matrix2D),
+    nonnegC = TRUE,
+    nonnegS = TRUE,
+    maxiter = 75,
+    thresh = 1e-6
+  )
+  # Extract the resolved spectral profiles from mcr output
+  resolved_spectra <- mcr_result$S
+  resolved_concentration <- mcr_result$C[[1]]
+  
+  reconstructed_spectra <-
+    resolved_concentration %*% t(resolved_spectra)
+  #
+  # Compares observed_spectra, input to the MCR-ALS algorithm [n_samples, n_bands], to reconstructed results
+  # Example for plotting the original vs. reconstructed data
+  n_samples <- nrow(matrix2D)
+  n_bands <- ncol(matrix2D)
+  # Remove comment if you want to plot the MCR output
+  # title <-
+  #   paste0(type, ": Comparison of Original and Reconstructed Spectra")
+  # save_name <-
+  #   paste0(
+  #     'C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/',
+  #     type,
+  #     '_mcr_als.jpg'
+  #   )
+  # Plot for the first sample
+  # jpeg(file = save_name)
+  # plot(
+  #   1:n_bands,
+  #   matrix2D[3,],
+  #   type = "l",
+  #   col = "red",
+  #   xlab = "Wavelength/Band",
+  #   ylab = "Intensity",
+  #   main = title
+  # )
+  # lines(1:n_bands, reconstructed_spectra[3,], col = "blue")
+  # legend(
+  #   "topright",
+  #   legend = c("Original", "Reconstructed"),
+  #   col = c("red", "blue")
+  # )
+  # dev.off()
+  #Complete PCA to find if the number of components has changed
+  # # Eigenvalue calculation (using concentration profiles as an example)
+  eigenvalues <- eigen(cov(reconstructed_spectra))$values
+  
+  # Kaiser’s rule: Select components with eigenvalues > 1
+  significant_components <- which(eigenvalues > 1)
+  return(list(comp = significant_components, spectra = resolved_spectra))
+}
+```
+
+GAMES-HOWELL
+```{r}
+complete_howells_game<-function(control, treated, name){
+  cat('-----Games-Howell Test Debugging-----', '\n')
+  final_spectra_avg <- rowMeans(control)  # This takes the average of the two columns in final_spectra
+  
+  # Ensure that both final_spectra_avg and treated_spectra are vectors of the same length
+  # Combine them into a single dataframe with a group label
+  
+  control_spectra <- data.frame(Spectra = final_spectra_avg, Group = "Control")
+  treated_spectra_df <- data.frame(Spectra = treated, Group = "Treated")
+  
+  # Combine the two datasets into one dataframe
+  compiled_spectra <- rbind(control_spectra, treated_spectra_df)
+  # write.csv(compiled_spectra, 'D:/Reflectance summary/compiled_spectra.csv')
+  # Perform the Games-Howell test
+  gh_results <- posthocTGH(y = compiled_spectra$Spectra, 
+                           x = compiled_spectra$Group, 
+                           method = "games-howell")
+  
+  # Extract mean and confidence intervals for plotting
+  means <- tapply(compiled_spectra$Spectra, compiled_spectra$Group, mean)
+  ci <- tapply(compiled_spectra$Spectra, compiled_spectra$Group, function(x) {
+    c(
+      mean(x) - qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x)),
+      mean(x) + qt(0.975, length(x) - 1) * sd(x) / sqrt(length(x))
+    )
+  })
+  # 
+  # # Prepare data for plotting
+  # plot_data <- data.frame(
+  #   Group = names(means),
+  #   Mean = as.numeric(means),
+  #   CI_Lower = sapply(ci, `[`, 1),
+  #   CI_Upper = sapply(ci, `[`, 2)
+  # )
+  # 
+  # # Create the plot
+  # ggplot(plot_data, aes(x = Group, y = Mean)) +
+  #   geom_point(size = 3) +
+  #   geom_errorbar(aes(ymin = CI_Lower, ymax = CI_Upper), width = 0.2) +
+  #   labs(title = "Mean Spectral Values by Group with 95% Confidence Intervals",
+  #        x = "Group", y = "Mean Spectral Value") +
+  #   theme_minimal()
+  # 
+  
+  # 4. Prepare a summary dataframe
+  summary_df <- data.frame(
+    Control = means[1],
+    Treated = means[2],
+    Diff = gh_results$output$games.howell$diff,
+    CI_Lower = gh_results$output$games.howell$ci.lo,
+    CI_Upper = gh_results$output$games.howell$ci.hi,
+    P_Value = gh_results$output$games.howell$p
+  )
+  
+  # 5. Save the summary to a CSV file
+  write.csv(summary_df, paste('D:/Reflectance summary/', name, '_summary.txt'), row.names = FALSE)
+}
+```
+MAIN
+```{r}
+
+# control<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/14_1_20230724_2023_07_24_12_33_04/raw_rd_rf')
+# treated<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/4_1_20230724_2023_07_24_09_00_14/raw_rd_rf')
+# 
+# control_mask<-creating_conditions(control)
+# control_red_cutoff<-control_mask$red
+# control_ob_avg<-control_mask$ob
+# control_r_bg_avg<-control_mask$rbg
+# 
+# control_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = control_red_cutoff, orange_blue_avg_raster = control_ob_avg, red_bg_avg_raster = control_r_bg_avg)
+# plot(control_reclassified_raster)
+# #
+# treated_mask<-creating_conditions(treated)
+# treated_red_cutoff<-treated_mask$red
+# treated_ob_avg<-treated_mask$ob
+# treated_r_bg_avg<-treated_mask$rbg
+# 
+# treated_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = treated_red_cutoff, orange_blue_avg_raster = treated_ob_avg, red_bg_avg_raster = treated_r_bg_avg)
+# 
+# 
+# plot(treated_reclassified_raster)
+# 
+# 
+# control_subset<-stacking_selected_bands(control)
+# 
+# treated_subset<-stacking_selected_bands(treated)
+# 
+# masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
+# masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
+
+# subset_control<-applying_spatial_subset(masked_control_subset)
+# 
+# control2d<-convert_to_2d(masked_control_subset)
+# treated2d<-convert_to_2d(masked_treated_subset)
+# 
+# write.csv(control2d, 'C:\\Users\\RDCRLAAU\\Desktop\\Plant_as_bioindicators\\MCR-ALS R Processing\\subset_testing_control.txt')
+# write.csv(treated2d, 'C:\\Users\\RDCRLAAU\\Desktop\\Plant_as_bioindicators\\MCR-ALS R Processing\\subset_testing_treatment.txt')
+# initial_comp<-complete_pca(control2d)
+# #
+# # na_control<-convert_to_zero(control2d)
+# #
+# # na_treated<- convert_to_zero(treated2d)
+# 
+# control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
+# control_spectra<-control_mcr$spectra
+# # control spectra: [1:59, 1:2]
+# treated_mcr<-complete_mcr_als(treated2d, control_mcr$comp, 'Treated')
+# treated_spectra<-treated_mcr$spectra
+# treated_spectra<-treated_mcr$spectra
+# # treated spectra: [1:59,1]
+# print(Sys.time()-start) # Takes 33.9 min to complete
+# output<-complete_howells_game(control_spectra, treated_spectra)
+# plotGamesHowell
+grouping_VNIR_files()
+print(Sys.time()-start)
+```
