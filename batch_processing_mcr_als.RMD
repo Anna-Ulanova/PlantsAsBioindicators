@@ -10,10 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 Testing out the method described in Ruffing et al.
-
+Each group takes ~50 min to run
 ## R Markdown
 
 ```{r}
+
 library(raster)
 
 library(tidyverse)
@@ -23,7 +24,6 @@ library(ggplot2)
 library(userfriendlyscience)
 library(car)
 library(dplyr)
-start = Sys.time()
 ```
 1. Isolates all of the directories for VNIR and groups based on treatment, metal, grass
 - control Se, control As, 5 ppm Se & As, 15 ppm Se & As, 25 ppm Se & As
@@ -203,13 +203,13 @@ open_combine_rasters <-
     }
     
     raster_group_summary <- raster_group_summary[-1, ]
-    cat('Dimension of raster group summary df:',
-        dim(raster_group_summary),
-        '\n')
-    write.csv(
-      raster_group_summary,
-      paste('D:/Reflectance summary/one_matrix', "_", type, ".txt")
-    )
+    # cat('Dimension of raster group summary df:',
+    #     dim(raster_group_summary),
+    #     '\n')
+    # write.csv(
+    #   raster_group_summary,
+    #   paste('D:/Reflectance summary/one_matrix', "_", type, ".txt")
+    # )
     return(raster_group_summary)
   }
 ```
@@ -614,7 +614,7 @@ complete_howells_game<-function(control, treated, name){
   
   # Combine the two datasets into one dataframe
   compiled_spectra <- rbind(control_spectra, treated_spectra_df)
-  # write.csv(compiled_spectra, 'D:/Reflectance summary/compiled_spectra.csv')
+  write.csv(compiled_spectra, paste('D:/Reflectance summary/', name,'_compiled_spectra.csv'))
   # Perform the Games-Howell test
   gh_results <- posthocTGH(y = compiled_spectra$Spectra, 
                            x = compiled_spectra$Group, 
@@ -715,6 +715,9 @@ MAIN
 # print(Sys.time()-start) # Takes 33.9 min to complete
 # output<-complete_howells_game(control_spectra, treated_spectra)
 # plotGamesHowell
+start = Sys.time()
 grouping_VNIR_files()
-print(Sys.time()-start)
+end = Sys.time()
+time = end-start
+print(time)
 ```
