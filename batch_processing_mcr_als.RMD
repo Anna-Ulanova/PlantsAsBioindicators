@@ -278,53 +278,6 @@ applying_spatial_subset <- function(raster) {
   
   return(cropped_raster)
 }
-  # # cat('selected raster is: ' , dim(raster),'\n')
-  # predominantly_zero = TRUE
-  # col_range = seq(75,(columns-75),75)
-  # row_range = seq(75,(rows-75),75)
-  # coordinates<-expand.grid(x=row_range, y=col_range)
-  # # subset_raster<-matrix(0, nrow=1, ncol=59)
-  # # cat("parent raster is: ", dim(subset_raster),'\n')
-  # while (predominantly_zero) {
-  #   # Add no repeats
-  #   shuffled_coordinates <- coordinates[sample(nrow(coordinates),1), ]
-  #   random_r <- shuffled_coordinates$x
-  #   random_c <- shuffled_coordinates$y
-  #   row_min <- random_r - 49
-  #   row_max <- random_r + 50
-  #   col_min <- random_c - 49
-  #   col_max <- random_c + 50
-  #   # Extract the 100x100 square
-  #   subset_raster <-
-  #     crop(first_layer,
-  #          extent(first_layer, row_min, row_max, col_min, col_max))
-  #   
-  #   # Convert the square to a matrix for easier analysis
-  #   square_values <- as.matrix(subset_raster)
-  #   
-  #   # Count zero values
-  #   zero_count <- sum(square_values == 0)
-  #   # Count total number of cells in matrix
-  #   total_count <-
-  #     total_count <- dim(square_values)[1] * dim(square_values)[2]
-  #   
-  #   # Calculate the percentage of non-zero values
-  #   zero_percentage <- (zero_count / total_count) * 100
-  #   # Check if it's 60% or more
-  #   if (zero_percentage <= 40) {
-  #     cat(random_r,',', random_c,'\n')
-  #     predominantly_zero = FALSE
-  #     raster <-
-  #       crop(raster,
-  #            extent(raster, row_min, row_max, col_min, col_max))
-  #     # Dimensions of cropped 3D should always be 100*100*59
-  #     cat("DIMENSIONS OF 3D CROPPED RASTER: ", dim(raster), '\n')
-  #     return(raster)
-  #   } else{
-  #       #print('')
-  #   }
-  # }
-# }
 ```
 2. For each raster per group: 
 - Applies mask based on wavelength conditions
@@ -662,59 +615,6 @@ complete_howells_game<-function(control, treated, name){
 ```
 MAIN
 ```{r}
-
-# control<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/14_1_20230724_2023_07_24_12_33_04/raw_rd_rf')
-# treated<-stack('C:/Users/RDCRLAAU/Desktop/Plant_as_bioindicators/MCR-ALS R Processing/Test Bands/4_1_20230724_2023_07_24_09_00_14/raw_rd_rf')
-# 
-# control_mask<-creating_conditions(control)
-# control_red_cutoff<-control_mask$red
-# control_ob_avg<-control_mask$ob
-# control_r_bg_avg<-control_mask$rbg
-# 
-# control_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = control_red_cutoff, orange_blue_avg_raster = control_ob_avg, red_bg_avg_raster = control_r_bg_avg)
-# plot(control_reclassified_raster)
-# #
-# treated_mask<-creating_conditions(treated)
-# treated_red_cutoff<-treated_mask$red
-# treated_ob_avg<-treated_mask$ob
-# treated_r_bg_avg<-treated_mask$rbg
-# 
-# treated_reclassified_raster <- classify_raster_based_on_conditions(red_cutoff_raster = treated_red_cutoff, orange_blue_avg_raster = treated_ob_avg, red_bg_avg_raster = treated_r_bg_avg)
-# 
-# 
-# plot(treated_reclassified_raster)
-# 
-# 
-# control_subset<-stacking_selected_bands(control)
-# 
-# treated_subset<-stacking_selected_bands(treated)
-# 
-# masked_control_subset<-applying_mask_on_subset(control_subset, control_reclassified_raster)
-# masked_treated_subset<-applying_mask_on_subset(treated_subset, treated_reclassified_raster)
-
-# subset_control<-applying_spatial_subset(masked_control_subset)
-# 
-# control2d<-convert_to_2d(masked_control_subset)
-# treated2d<-convert_to_2d(masked_treated_subset)
-# 
-# write.csv(control2d, 'C:\\Users\\RDCRLAAU\\Desktop\\Plant_as_bioindicators\\MCR-ALS R Processing\\subset_testing_control.txt')
-# write.csv(treated2d, 'C:\\Users\\RDCRLAAU\\Desktop\\Plant_as_bioindicators\\MCR-ALS R Processing\\subset_testing_treatment.txt')
-# initial_comp<-complete_pca(control2d)
-# #
-# # na_control<-convert_to_zero(control2d)
-# #
-# # na_treated<- convert_to_zero(treated2d)
-# 
-# control_mcr<-complete_mcr_als(control2d, initial_comp,'Control')
-# control_spectra<-control_mcr$spectra
-# # control spectra: [1:59, 1:2]
-# treated_mcr<-complete_mcr_als(treated2d, control_mcr$comp, 'Treated')
-# treated_spectra<-treated_mcr$spectra
-# treated_spectra<-treated_mcr$spectra
-# # treated spectra: [1:59,1]
-# print(Sys.time()-start) # Takes 33.9 min to complete
-# output<-complete_howells_game(control_spectra, treated_spectra)
-# plotGamesHowell
 start = Sys.time()
 grouping_VNIR_files()
 end = Sys.time()
