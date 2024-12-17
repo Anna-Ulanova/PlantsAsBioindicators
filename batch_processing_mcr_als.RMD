@@ -80,11 +80,16 @@ grouping_VNIR_files <- function() {
 }
 ```
 
+# Updates require to group by metal, treatment type and concentration AND BY SAMPLING DATE
+# Sampling dates: GH_20231213, GH_20231121, GH_20231116, GH_20231114, GH_20230822, GH_20230801
+# GH_20230726, GH_20230724
 
 ```{r Polished and debugged}
 assigning_control_v_treated<-function(grouped){
+  dates <- c("GH_20231213", "GH_20231121", "GH_20231116", "GH_20231114", 
+           "GH_20230822", "GH_20230801", "GH_20230726", "GH_20230724")
   # Define the control groups and their corresponding treatments
-  control_treatment_mapping <- list(
+  base_control_treatment <- list(
     SG_Sel_0 = c("SG_Sel_5", "SG_Sel_15", "SG_Sel_25"),
     bahia_Sel_0 = c("bahia_Sel_5", "bahia_Sel_15", "bahia_Sel_25"),
     PRG_Sel_0 = c("PRG_Sel_5", "PRG_Sel_15", "PRG_Sel_25"),
@@ -94,7 +99,7 @@ assigning_control_v_treated<-function(grouped){
     PRG_As_0 = c("PRG_As_5", "PRG_As_15", "PRG_As_25"))
     #PRG_As_0 = c("PRG_As_15"))
 
-  control_type_names_mapping <- list(
+  base_control_type_names <- list(
     SG_Sel_0 = c("SG_Sel_control_v_5", "SG_Sel_control_v_15", "SG_Sel_control_v_25"),
     bahia_Sel_0 = c("bahia_Sel_control_v_5", "bahia_Sel_control_v_15", "bahia_Sel_control_v_25"),
     PRG_Sel_0 = c("PRG_Sel_control_v_5", "PRG_Sel_control_v_15", "PRG_Sel_control_v_25"),
@@ -104,6 +109,22 @@ assigning_control_v_treated<-function(grouped){
     PRG_As_0 = c("PRG_As_control_v_5", "PRG_As_control_v_15", "PRG_As_control_v_25"))
     #PRG_As_0 = c("PRG_As_control_v_15"))
 
+
+  # Initialize expanded lists
+  control_treatment_mapping <- list()
+  control_type_names_mapping <- list()
+  
+  # Generate lists for each date
+  for (date in dates) {
+    for (control in names(base_control_treatment)) {
+      # Expand control_treatment_mapping
+      new_control <- paste0(control, "_", date)
+      control_treatment_mapping[[new_control]] <- paste0(base_control_treatment[[control]], "_", date)
+      
+      # Expand control_type_names_mapping
+      control_type_names_mapping[[new_control]] <- paste0(base_control_type_names[[control]], "_", date)
+    }
+  }
   # Iterate over each control group in the mapping
   for (control in names(control_treatment_mapping)) {
     # Extract the control directories
